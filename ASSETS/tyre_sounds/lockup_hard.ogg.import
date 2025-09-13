@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/lockup_hard.ogg-b09d8f80d900599dc6f41cb4c563e6ce.oggstr"
+
+[deps]
+
+source_file="res://ASSETS/tyre_sounds/lockup_hard.ogg"
+dest_files=[ "res://.import/lockup_hard.ogg-b09d8f80d900599dc6f41cb4c563e6ce.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=0
