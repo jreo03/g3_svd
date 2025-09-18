@@ -7,7 +7,7 @@ export var SUS_rest_length: float = 0.3
 export var WL_size: float = 0.55
 export var WL_weight: float = 1.0
 export var TR_stiffness: float = 40
-export var TR_deform_factor: float = 5
+export var TR_deform_factor: float = 1
 export var TR_deform_threshold: float = 1
 export var TR_spin_resistence_rate: float = 20
 export var TR_friction: float = 1
@@ -31,6 +31,13 @@ export var DT_HandbrakeBias: float = 0
 export var DT_BrakeBias: float = 1
 export(int, "Bump", "Absorb") var curb_step_behaviour = 1
 
+export(Array, NodePath) var AN_spinning_meshes: Array
+export(Array, NodePath) var AN_fixed_meshes: Array
+#export(Array, NodePath) var AN_steering_meshes: Array
+var a_s_m: Array
+var a_f_m: Array
+#var a_s2_m: Array
+
 onready var car: RigidBody = get_parent()
 
 var spin: float = 0
@@ -47,7 +54,10 @@ var HUB_past_pos: float
 export var HUB_max_travel: float = 0.3
 export var HUB_min_travel: float = -10.1
 export var HUB_spring_rest: float = 0.45
-onready var HUB_visual = $hub
+onready var AN_hub: Position3D = $hub
+onready var AN_spin: Position3D = $hub/spin
+onready var AN_steer: Position3D = $hub/steer
+onready var AN_fixed: Position3D = $hub/fixed
 
 var TYRE_deflated: float
 var TYRE_vertical_v: float
@@ -84,6 +94,23 @@ var OUTPUT_compressed: float
 var past_global_axle_pos: Vector3
 var predicted_s_force: float
 
+func _ready():
+	for i in AN_spinning_meshes:
+		a_s_m.append(get_node(i))
+	for i in AN_fixed_meshes:
+		a_f_m.append(get_node(i))
+#	for i in AN_steering_meshes:
+#		a_s2_m.append(get_node(i))
+
+	for i in a_s_m:
+		remove_child(i)
+		AN_spin.add_child(i)
+
+	for i in a_f_m:
+		remove_child(i)
+		AN_fixed.add_child(i)
+
+
 func _physics_process(delta):
 	if not car.PSDB:
 		return
@@ -106,7 +133,7 @@ func _physics_process(delta):
 	var local_velocity: Vector3 = global_transform.basis.orthonormalized().xform_inv(velocity)
 	
 	if STATE_brake_locked:
-		$hub.rotate_x(spin*delta*2.0)
+		AN_spin.rotate_x(spin*delta*2.0)
 	
 	total_w_weight = WL_weight*1.0
 	
@@ -220,10 +247,10 @@ func _physics_process(delta):
 		
 		var soften: float = abs(spin/20.0)
 		
-		t_stiff_y /= soften +1
-		t_damp_y /= soften +1
-		t_stiff_x /= soften +1
-		t_damp_x /= soften +1
+		t_stiff_y /= soften*TR_deform_factor +1
+		t_damp_y /= soften*TR_deform_factor +1
+		t_stiff_x /= soften*TR_deform_factor +1
+		t_damp_x /= soften*TR_deform_factor +1
 
 		
 		# GROUND
@@ -383,6 +410,6 @@ func _physics_process(delta):
 	past_global_axle_pos = global_translation
 	# end
 	
-	$hub.global_translation = c_point+global_transform.basis.orthonormalized().xform(Vector3(0,real_wheelsize - TYRE_deflated,0))
+	AN_hub.global_translation = c_point+global_transform.basis.orthonormalized().xform(Vector3(0,real_wheelsize - TYRE_deflated,0))
 	if not STATE_brake_locked:
-		$hub.rotate_x(spin*delta*2.0)
+		AN_spin.rotate_x(spin*delta*2.0)

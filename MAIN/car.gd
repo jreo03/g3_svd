@@ -1,7 +1,8 @@
 extends RigidBody
 class_name SVD_BODY
+var ready: bool
 
-export(float, 0.0001, 1000) var PHYS_form_factor: float = 2
+export(float, 0.0001, 1000) var PHYS_form_factor: float = 1
 export var DB_steer_disabled: bool
 export var DB_forces_visible: bool
 var engine_resistance: float
@@ -13,15 +14,16 @@ var past_rpm: float
 
 var wheels: Array
 var wheels_count: int
+var wheels_position: Vector3
 var gear: int
 var past_speed: float
 var past_rpmspeed: float
 var rt_dsweight: float
 
-export var Controls: Resource = preload("res://MAIN/default_controls.res")
+export var Controls: Resource
 
 export var EN_DriveForce: float = 12
-export(int, "Wheels Synced", "Wheels Desynced") var EN_DriveForceBehavior
+export(int, "Wheels Synced", "Wheels Unsynced") var EN_DriveForceBehavior
 export var EN_RevUpSpeed: float = 150
 export var EN_RevDownSpeed: float = 50
 export var EN_RevAlignmentRate: float = 50
@@ -48,7 +50,8 @@ export var SR_pivot_point: float = -1.151
 export var SR_pivot_node: NodePath setget XSR_pivot_node
 func XSR_pivot_node(val):
 	SR_pivot_node = val
-	yield(self,"ready")
+	if not ready:
+		yield(self,"ready")
 	if get_node(val) is Spatial:
 		SR_pivot_point = get_node(val).translation.z
 	else:
@@ -60,7 +63,8 @@ export(Array, NodePath) var SR_wheels: Array setget XSR_wheels
 var steer_wheels: Array
 func XSR_wheels(val):
 	SR_wheels = val
-	yield(self,"ready")
+	if not ready:
+		yield(self,"ready")
 	steer_wheels = []
 	for i in val:
 		steer_wheels.append(get_node(i))
@@ -106,6 +110,7 @@ var target_gear: int
 var on_reverse: bool
 
 func _ready():
+	ready = true
 	refresh_wheels()
 #	XSR_wheels(SR_wheels)
 
@@ -514,6 +519,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	OUTPUT_total_compressed = 0
 	
 	MEASURE_driven_wheel_radius = 0
+	wheels_position = Vector3.ZERO
 	
 	for wheel in wheels:
 		wheel = wheel as SVD_WHEEL # cast placeholder
@@ -521,10 +527,12 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		ds_weight += wheel.DT_influence
 		rpm_speed += wheel.spin*wheel.DT_influence
 		var w_torque_est: float = (torque_data[1]*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
+		w_torque_est = min(w_torque_est,test_cgrip_rads*test_dsweight)
 		
 #		w_torque_est /= torque_data[1]*delta
 		
 		var w_overdrive: float = max(w_torque_est/(torque_data[1]/(g_ratio/hz_scale)) -1.0,0)
+#		w_overdrive = 10
 
 		var weighed_grip: float = (test_cgrip_rads*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
 
@@ -532,18 +540,23 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 #		var c_grip_od: float = weighed_grip/(1.0/(w_overdrive +1))
 		var acceleration: float = clamp(torque_data[0],-c_grip_od,c_grip_od)
 
-		var predicted_spin = wheel.spin -acceleration/g_ratio -wheel.MEASURE_aligning
-		
 		var dt_dist: float
 		if EN_DriveForceBehavior == 1:
+			var predicted_spin: float
 			if gear<0:
-				dt_dist = ((cs_rads/g_ratio + median_rads)/test_cstab)
-			else:
-				dt_dist = ((cs_rads/g_ratio - median_rads)/test_cstab)
-		else:
-			if gear<0:
+				predicted_spin = median_rads +acceleration/g_ratio -wheel.MEASURE_aligning
 				dt_dist = ((cs_rads/g_ratio + predicted_spin)/test_cstab)
 			else:
+				predicted_spin = median_rads -acceleration/g_ratio -wheel.MEASURE_aligning
+				dt_dist = ((cs_rads/g_ratio - predicted_spin)/test_cstab)
+		else:
+			var predicted_spin: float
+		
+			if gear<0:
+				predicted_spin = wheel.spin +acceleration/g_ratio -wheel.MEASURE_aligning
+				dt_dist = ((cs_rads/g_ratio + predicted_spin)/test_cstab)
+			else:
+				predicted_spin = wheel.spin -acceleration/g_ratio -wheel.MEASURE_aligning
 				dt_dist = ((cs_rads/g_ratio - predicted_spin)/test_cstab)
 
 		if not EN_CanStall and rpm<=EN_IdleRPM:
@@ -554,6 +567,8 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		var od_red: float = max(abs(align_t/rads2rpm) -w_torque_est/rads2rpm,0)
 		
 		wheel.dt_overdrive = w_overdrive
+		if wheel.name == "rl":
+			print(align_t)
 		if wheel.name == "rl":
 			_debug.queue[" dt_dist"] = dt_dist
 			_debug.queue[" w_overdrive"] = w_overdrive
@@ -573,9 +588,12 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		apply_impulse(wheel.impulse[0],wheel.impulse[1])
 		
 		OUTPUT_total_compressed += wheel.OUTPUT_compressed
-		MEASURE_driven_wheel_radius += wheel.WL_size
+		MEASURE_driven_wheel_radius += wheel.WL_size*wheel.DT_influence
+		
+		wheels_position += wheel.AN_hub.global_translation
 	
-	MEASURE_driven_wheel_radius /= ds_weight
+	wheels_position /= wheels_count
+	MEASURE_driven_wheel_radius /= ds_weight/2.0
 	
 	rpm_windspeed = (linear_velocity.length()*g_ratio/MEASURE_driven_wheel_radius)*rads2rpm*2.0
 	prev_gear_rpm_speed = (linear_velocity.length()*prev_g_ratio/MEASURE_driven_wheel_radius)*rads2rpm*2.0
