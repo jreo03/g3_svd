@@ -17,8 +17,8 @@ func _physics_process(delta):
 		total_skidding += abs(i.OUTPUT_skidding)
 		total_rubbing += abs(i.OUTPUT_stressing)
 	
-	total_skidding = max(total_skidding -50,0)
-	total_rubbing = max(total_rubbing -30,0)
+	total_skidding = max(total_skidding -20,0)*0.25
+	total_rubbing = max(total_rubbing -10,0)
 	
 	$rolling.pitch_scale = 1.0 +total_rolling/1000
 	$rolling.unit_db = clamp(linear2db(max(total_rolling/1000.0,0)),-80,6)
