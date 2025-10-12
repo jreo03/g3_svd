@@ -32,6 +32,8 @@ export var EN_MaxRPM: float = 7000
 export var EN_CanStall: bool = false
 export var EN_CanOverRev: bool = false
 export var EN_StallPrevention: float = 2
+export var EN_Torque_Curve: Curve
+export var EN_Decline_Curve: Curve
 
 export(Array, float) var GB_ForwardGearRatios: Array = [
 	3.321,
@@ -45,6 +47,12 @@ export(Array, float) var GB_ReverseGearRatios: Array = [
 	3.0,
 ]
 export var GB_clutch_needed: float = 0.25
+
+#export(int, "Clutch-pack", "Viscous") var DIFF_Central_Differential_Behaviour: int
+export var DIFF_Central_Locking_Preload: float = 0
+export var DIFF_Central_Locking_Power: float = 0.0
+export var DIFF_Central_Locking_Coast: float = 0.0
+
 
 export var SR_pivot_point: float = -1.151
 export var SR_pivot_node: NodePath setget XSR_pivot_node
@@ -145,6 +153,12 @@ func _input(event):
 	if event.is_action_pressed("debug_key"):
 		DB_forces_visible = not DB_forces_visible
 		$placeholder.visible = not DB_forces_visible
+	# debugs
+	if event.is_action_pressed("toggle_steering"):
+#		Controls = Controls as ControlSettings
+		Controls.UseMouseSteering = not Controls.UseMouseSteering
+	# end
+		
 
 var prev_g_ratio: float
 
@@ -183,32 +197,32 @@ func gearbox(dt) -> float:
 	prev_g_ratio *= GB_FinalDriveRatio*2.0
 	return rat*GB_FinalDriveRatio
 	
-func engine(dt) -> Array:
+func engine(dt: float, c_revup: float, c_revdown: float) -> Array:
 	
 	var hz_scale: float = dt*60.0
 	IP_throttle = analog_accelerate
 	
 	throttle -= (throttle - IP_throttle)*0.5
 	
-	var midpoint: float = EN_RevDownSpeed/(EN_RevUpSpeed +EN_RevDownSpeed)
+	var midpoint: float = c_revdown/(c_revup +c_revdown)
 	var from_idle: float = 1.0 -rpm/EN_IdleRPM
 	
-	if rpm<EN_IdleRPM+EN_RevDownSpeed:
+	if rpm<EN_IdleRPM+c_revdown:
 		if EN_CanStall:
 			throttle = max(throttle,min(midpoint*min(EN_StallPrevention,1) +from_idle*max(EN_StallPrevention-1,0),1))
 		else:
-			rpm = EN_IdleRPM +EN_RevDownSpeed*hz_scale
-	elif rpm>EN_MaxRPM-EN_RevUpSpeed:
+			rpm = EN_IdleRPM +c_revdown*hz_scale
+	elif rpm>EN_MaxRPM-c_revup:
 		if EN_CanOverRev:
 			throttle = 0.0
 		else:
-			rpm = EN_MaxRPM -EN_RevUpSpeed*hz_scale
-	var torque_measure: float = throttle*EN_RevUpSpeed - EN_RevDownSpeed*(1.0 -throttle)
+			rpm = EN_MaxRPM -c_revup*hz_scale
+	var torque_measure: float = throttle*c_revup - c_revdown*(1.0 -throttle)
 	rpm += torque_measure*hz_scale
 	if not EN_CanStall and rpm<=EN_IdleRPM:
 		torque_measure *= 0
 		
-	return [torque_measure/rads2rpm,max(EN_RevUpSpeed,EN_RevDownSpeed)/rads2rpm,torque_measure]
+	return [torque_measure/rads2rpm,max(c_revup,c_revdown)/rads2rpm,torque_measure]
 
 func controls(d_scale):
 	
@@ -453,6 +467,19 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	rpm_speed = 0
 	prev_gear_rpm_speed = 0
 	
+	
+	var rpm_progress: float = (rpm -EN_IdleRPM)/(EN_MaxRPM -EN_IdleRPM)
+	var _tq = 1
+	var _dc = 1
+	
+	if EN_Torque_Curve:
+		_tq = EN_Torque_Curve.interpolate_baked(rpm_progress)
+	if EN_Decline_Curve:
+		_dc = EN_Decline_Curve.interpolate_baked(rpm_progress)
+	
+	var c_revup: float = EN_RevUpSpeed*_tq
+	var c_revdown: float = EN_RevDownSpeed*_dc
+	
 	var g_ratio: float = gearbox(delta)*2.0
 	
 	apply_central_impulse(PSDB.total_gravity*mass*delta)
@@ -478,9 +505,20 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	_debug.queue[" gm/s"] = linear_velocity.length()
 	_debug.queue[" gkm/h"] = int(linear_velocity.length()*3.6)
 	_debug.queue[" gs"] = (linear_velocity.length()/hz_scale - past_speed)/9.8/delta
+	_debug.queue[" gs target"] = 0.0
+	if gear == 1:
+		_debug.queue[" gs target"] = 0.619686
+	elif gear == 2:
+		_debug.queue[" gs target"] = 0.358457
+	elif gear == 3:
+		_debug.queue[" gs target"] = 0.246538
+	elif gear == 4:
+		_debug.queue[" gs target"] = 0.188477
+	elif gear == 5:
+		_debug.queue[" gs target"] = 0.143074
 	past_speed = linear_velocity.length()/hz_scale
 	var cs_rads: float = rpm/rads2rpm
-	var torque_data: Array = engine(delta)
+	var torque_data: Array = engine(delta,c_revup,c_revdown)
 	
 	rt_dsweight = max(rt_dsweight,1)
 	
@@ -503,16 +541,24 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	$"../sw".rect_rotation = -steer_output*420
 	$"../sw_desired".rect_rotation = -steer_input*420
 
-	var median_rads: float
+	var drive_median: float
+	var central_median: float
+	var central_travel_median: float
+	var fastest_wheel: float
 	
 	if EN_DriveForceBehavior == 1:
 		var count: float
 		for wheel in wheels:
 			wheel = wheel as SVD_WHEEL # cast placeholder
 			count += wheel.DT_influence
-			median_rads += wheel.spin*wheel.DT_influence
+			drive_median += wheel.spin*wheel.DT_influence
+			central_median += wheel.spin
+			central_travel_median += wheel.MEASURE_travelled
+			fastest_wheel = max(fastest_wheel,abs(wheel.spin))
 		
-		median_rads /= count
+		central_median /= wheels_count
+		drive_median /= count
+		central_travel_median /= wheels_count
 	
 	var DB_SLIP: float
 	
@@ -521,6 +567,16 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	MEASURE_driven_wheel_radius = 0
 	wheels_position = Vector3.ZERO
 	
+	var rev_down_difference: float = c_revdown/c_revup
+	var abs_thresholded: float = 1
+
+	for wheel in wheels:
+		wheel = wheel as SVD_WHEEL # cast placeholder
+		
+		if wheel.Signals_ABS:
+			abs_thresholded -= abs(abs(wheel.spin +wheel.MEASURE_aligning) - fastest_wheel)*wheel.Signals_ABS_Sensitivity*wheels_count/100.0
+
+	abs_thresholded = lerp(max(abs_thresholded,0),1,analog_handbrake)
 	for wheel in wheels:
 		wheel = wheel as SVD_WHEEL # cast placeholder
 		
@@ -544,10 +600,10 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		if EN_DriveForceBehavior == 1:
 			var predicted_spin: float
 			if gear<0:
-				predicted_spin = median_rads +acceleration/g_ratio -wheel.MEASURE_aligning
+				predicted_spin = drive_median +acceleration/g_ratio -wheel.MEASURE_aligning
 				dt_dist = ((cs_rads/g_ratio + predicted_spin)/test_cstab)
 			else:
-				predicted_spin = median_rads -acceleration/g_ratio -wheel.MEASURE_aligning
+				predicted_spin = drive_median -acceleration/g_ratio -wheel.MEASURE_aligning
 				dt_dist = ((cs_rads/g_ratio - predicted_spin)/test_cstab)
 		else:
 			var predicted_spin: float
@@ -567,8 +623,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		var od_red: float = max(abs(align_t/rads2rpm) -w_torque_est/rads2rpm,0)
 		
 		wheel.dt_overdrive = w_overdrive
-		if wheel.name == "rl":
-			print(align_t)
+#		wheel.dt_overdrive = 1
 		if wheel.name == "rl":
 			_debug.queue[" dt_dist"] = dt_dist
 			_debug.queue[" w_overdrive"] = w_overdrive
@@ -581,9 +636,53 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		else:
 			wheel.dt_torque = w_torque
 			
-#		wheel.spin = 20
+		
 			
-		wheel.dt_braking = wheel.DT_BrakeTorque*min(wheel.DT_BrakeBias*analog_decelerate + wheel.DT_HandbrakeBias*analog_handbrake,1)
+		if wheel.df_lockto:
+			# bar
+			var diff_median: float = (wheel.spin + wheel.df_lockto.spin)/2.0
+			var diff_wheel_travel_distance: float = (wheel.MEASURE_travelled - wheel.df_lockto.MEASURE_travelled)/2.0
+			var diff_dampening_torque: float = wheel.spin - diff_median
+			var diff_stabilise: float = (1.0 -(1.0/(abs(diff_median*delta*wheel.WL_size) +1)))
+			
+			var locking_torque: float = wheel.DIFF_Locking_Preload/60.0
+			if w_torque>0:
+				locking_torque += w_torque*wheel.DIFF_Locking_Power*(w_overdrive +1)
+			else:
+				locking_torque -= w_torque*wheel.DIFF_Locking_Coast*rev_down_difference*(w_overdrive +1)
+				
+			locking_torque /= w_overdrive +1
+			
+			diff_wheel_travel_distance = clamp(diff_wheel_travel_distance,-locking_torque,locking_torque)
+			diff_dampening_torque = clamp(diff_dampening_torque,-locking_torque,locking_torque)
+			
+			wheel.MEASURE_travelled -= diff_wheel_travel_distance*diff_stabilise
+			wheel.dt_torque -= diff_wheel_travel_distance
+			wheel.dt_torque -= diff_dampening_torque*(w_overdrive +1)
+			
+			# central
+			var awd_diff_dampening_torque: float = diff_median - central_median
+			var awd_diff_central_travelled: float = (wheel.MEASURE_travelled + wheel.df_lockto.MEASURE_travelled)/2.0
+			var awd_diff_wheel_travel_distance: float = awd_diff_central_travelled - central_travel_median
+			var awd_diff_stabilise: float = (1.0 -(1.0/(abs(central_median*delta*wheel.WL_size) +1)))
+
+			var awd_locking_torque: float = DIFF_Central_Locking_Preload/60.0
+			if w_torque>0:
+				awd_locking_torque += w_torque*DIFF_Central_Locking_Power*(w_overdrive +1)
+			else:
+				awd_locking_torque -= w_torque*DIFF_Central_Locking_Coast*rev_down_difference*(w_overdrive +1)
+
+			awd_locking_torque /= w_overdrive +1
+
+			awd_diff_wheel_travel_distance = clamp(awd_diff_wheel_travel_distance,-awd_locking_torque,awd_locking_torque)
+			awd_diff_dampening_torque = clamp(awd_diff_dampening_torque,-awd_locking_torque,awd_locking_torque)
+
+			wheel.MEASURE_travelled -= awd_diff_wheel_travel_distance*awd_diff_stabilise
+			wheel.dt_torque -= awd_diff_wheel_travel_distance/2.0
+			wheel.dt_torque -= awd_diff_dampening_torque*(w_overdrive +1)
+			
+#		wheel.spin = 20
+		wheel.dt_braking = wheel.DT_BrakeTorque*min(wheel.DT_BrakeBias*analog_decelerate + wheel.DT_HandbrakeBias*analog_handbrake,1)*abs_thresholded
 
 		apply_impulse(wheel.impulse[0],wheel.impulse[1])
 		
@@ -604,7 +703,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	$DB_clutchslip.unit_db = max(linear2db(DB_SLIP*0.5),-80)
 	rt_dsweight = ds_weight
 	rpm_speed *= (rads2rpm/ds_weight)*g_ratio
-#	rpm_speed = (median_rads*rads2rpm)*g_ratio
+#	rpm_speed = (central_median*rads2rpm)*g_ratio
 	if gear<0:
 		rpm_speed = -rpm_speed
 	

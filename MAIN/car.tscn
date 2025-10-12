@@ -1,15 +1,22 @@
-[gd_scene load_steps=31 format=2]
+[gd_scene load_steps=34 format=2]
 
-[ext_resource path="res://control_schemes/default_controls.res" type="Resource" id=1]
+[ext_resource path="res://CUSTOMISE/control_schemes/gta_4_controls.res" type="Resource" id=1]
 [ext_resource path="res://ASSETS/engine0off.ogg" type="AudioStream" id=2]
 [ext_resource path="res://MAIN/wheel.tscn" type="PackedScene" id=3]
 [ext_resource path="res://MAIN/car.gd" type="Script" id=4]
+[ext_resource path="res://CUSTOMISE/tyre_models/faux_pacejka_mf.tres" type="Resource" id=5]
 [ext_resource path="res://ASSETS/engine0on.ogg" type="AudioStream" id=6]
 [ext_resource path="res://ASSETS/LFS_road_noise.wav" type="AudioStream" id=7]
 [ext_resource path="res://ASSETS/scraping.ogg" type="AudioStream" id=8]
 [ext_resource path="res://ASSETS/LFS_tyre_rub.wav" type="AudioStream" id=9]
 [ext_resource path="res://ASSETS/LFS_tyre_skid.wav" type="AudioStream" id=10]
 [ext_resource path="res://ASSETS/road_noises.gd" type="Script" id=11]
+
+[sub_resource type="Curve" id=31]
+_data = [ Vector2( 0, 0.571591 ), 0.0, 1.98636, 0, 0, Vector2( 0.402256, 1 ), 0.0, 0.0, 0, 0, Vector2( 0.552632, 0.907955 ), 0.0, 0.0, 0, 0, Vector2( 1, 0.798864 ), -1.20909, 0.0, 0, 0 ]
+
+[sub_resource type="Curve" id=32]
+_data = [ Vector2( 0, 0.332955 ), 0.0, 0.667045, 0, 1, Vector2( 1, 1 ), 0.667045, 0.0, 1, 0 ]
 
 [sub_resource type="SpatialMaterial" id=13]
 albedo_color = Color( 0.7, 0, 0, 1 )
@@ -298,8 +305,10 @@ can_sleep = false
 linear_damp = 0.0
 angular_damp = 0.0
 script = ExtResource( 4 )
-PHYS_form_factor = 1.4
 Controls = ExtResource( 1 )
+EN_DriveForceBehavior = 1
+EN_Torque_Curve = SubResource( 31 )
+EN_Decline_Curve = SubResource( 32 )
 SR_pivot_point = 0.0
 SR_pivot_node = NodePath("rl")
 SR_wheels = [ NodePath("fl"), NodePath("fr") ]
@@ -310,11 +319,15 @@ mesh = SubResource( 21 )
 
 [node name="fl" parent="." instance=ExtResource( 3 )]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, 1.151 )
-SUS_spring_stiffness = 30.0
-SUS_dampening = 2.5
-TR_deform_factor = 1.4
+SUS_spring_stiffness = 42.0
+SUS_dampening = 4.1
+SUS_rest_length = 0.28
+TR_Tire_Model = ExtResource( 5 )
+Signals_ABS = true
+Signals_ABS_Sensitivity = 0.4
 DT_influence = 0.0
-DT_BrakeTorque = 20.0
+DT_BrakeTorque = 30.0
+DT_BrakeBias = 0.8
 curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
@@ -333,11 +346,15 @@ mesh = SubResource( 30 )
 
 [node name="fr" parent="." instance=ExtResource( 3 )]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, 1.151 )
-SUS_spring_stiffness = 30.0
-SUS_dampening = 2.5
-TR_deform_factor = 1.4
+SUS_spring_stiffness = 42.0
+SUS_dampening = 4.1
+SUS_rest_length = 0.28
+TR_Tire_Model = ExtResource( 5 )
+Signals_ABS = true
+Signals_ABS_Sensitivity = 0.4
 DT_influence = 0.0
-DT_BrakeTorque = 20.0
+DT_BrakeTorque = 30.0
+DT_BrakeBias = 0.8
 curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
@@ -356,15 +373,18 @@ mesh = SubResource( 30 )
 
 [node name="rl" parent="." instance=ExtResource( 3 )]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, -1.151 )
-SUS_spring_stiffness = 29.0
-SUS_dampening = 2.45
-TR_deform_factor = 1.4
-DT_BrakeTorque = 20.0
-DT_HandbrakeBias = 213456.0
-DT_BrakeBias = 0.35
+SUS_dampening = 4.0
+SUS_rest_length = 0.28
+TR_Tire_Model = ExtResource( 5 )
+Signals_ABS = true
+Signals_ABS_Sensitivity = 0.4
+DT_BrakeTorque = 30.0
+DT_HandbrakeBias = 1.0
+DT_BrakeBias = 0.2
 curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+DIFF_lock_to = NodePath("../rr")
 
 [node name="placeholder_wheel" type="MeshInstance" parent="rl"]
 transform = Transform( 0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
@@ -380,15 +400,18 @@ mesh = SubResource( 30 )
 
 [node name="rr" parent="." instance=ExtResource( 3 )]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, -1.151 )
-SUS_spring_stiffness = 29.0
-SUS_dampening = 2.45
-TR_deform_factor = 1.4
-DT_BrakeTorque = 20.0
-DT_HandbrakeBias = 213456.0
-DT_BrakeBias = 0.35
+SUS_dampening = 4.0
+SUS_rest_length = 0.28
+TR_Tire_Model = ExtResource( 5 )
+Signals_ABS = true
+Signals_ABS_Sensitivity = 0.4
+DT_BrakeTorque = 30.0
+DT_HandbrakeBias = 1.0
+DT_BrakeBias = 0.2
 curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+DIFF_lock_to = NodePath("../rl")
 
 [node name="placeholder_wheel" type="MeshInstance" parent="rr"]
 transform = Transform( -0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
@@ -405,10 +428,6 @@ mesh = SubResource( 30 )
 [node name="CollisionShape" type="CollisionShape" parent="."]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0.1 )
 shape = SubResource( 6 )
-
-[node name="Camera" type="Camera" parent="."]
-transform = Transform( -1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0.805, 0.15 )
-far = 10000.0
 
 [node name="enon" type="AudioStreamPlayer3D" parent="."]
 stream = ExtResource( 6 )
