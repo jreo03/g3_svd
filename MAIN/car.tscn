@@ -322,6 +322,8 @@ transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, 1.151 )
 SUS_spring_stiffness = 42.0
 SUS_dampening = 4.1
 SUS_rest_length = 0.28
+SUS_tyre_stiffness = 33.0
+SUS_tyre_height = 0.087
 TR_Tire_Model = ExtResource( 5 )
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
@@ -333,7 +335,7 @@ AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_roto
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
 
 [node name="placeholder_wheel" type="MeshInstance" parent="fl"]
-transform = Transform( 0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
+transform = Transform( 0.092, 0, 0, 0, 0.292, 0, 0, 0, 0.292, 0, 0, 0 )
 mesh = SubResource( 25 )
 
 [node name="placeholder_rotor" type="MeshInstance" parent="fl"]
@@ -349,6 +351,8 @@ transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, 1.151 )
 SUS_spring_stiffness = 42.0
 SUS_dampening = 4.1
 SUS_rest_length = 0.28
+SUS_tyre_stiffness = 33.0
+SUS_tyre_height = 0.087
 TR_Tire_Model = ExtResource( 5 )
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
@@ -360,7 +364,7 @@ AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_roto
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
 
 [node name="placeholder_wheel" type="MeshInstance" parent="fr"]
-transform = Transform( -0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
+transform = Transform( -0.092, 0, 0, 0, 0.292, -2.55275e-08, 0, 2.55275e-08, 0.292, 0, 0, 0 )
 mesh = SubResource( 25 )
 
 [node name="placeholder_rotor" type="MeshInstance" parent="fr"]
@@ -375,6 +379,8 @@ mesh = SubResource( 30 )
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, -1.151 )
 SUS_dampening = 4.0
 SUS_rest_length = 0.28
+SUS_tyre_stiffness = 33.0
+SUS_tyre_height = 0.087
 TR_Tire_Model = ExtResource( 5 )
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
@@ -387,7 +393,7 @@ AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
 DIFF_lock_to = NodePath("../rr")
 
 [node name="placeholder_wheel" type="MeshInstance" parent="rl"]
-transform = Transform( 0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
+transform = Transform( 0.092, 0, 0, 0, 0.292, 0, 0, 0, 0.292, 0, 0, 0 )
 mesh = SubResource( 25 )
 
 [node name="placeholder_rotor" type="MeshInstance" parent="rl"]
@@ -402,6 +408,8 @@ mesh = SubResource( 30 )
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, -1.151 )
 SUS_dampening = 4.0
 SUS_rest_length = 0.28
+SUS_tyre_stiffness = 33.0
+SUS_tyre_height = 0.087
 TR_Tire_Model = ExtResource( 5 )
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
@@ -414,7 +422,7 @@ AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
 DIFF_lock_to = NodePath("../rl")
 
 [node name="placeholder_wheel" type="MeshInstance" parent="rr"]
-transform = Transform( -0.091, 0, 0, 0, 0.29, 0, 0, 0, 0.29, 0, 0, 0 )
+transform = Transform( -0.092, 0, 0, 0, 0.292, -2.55275e-08, 0, 2.55275e-08, 0.292, 0, 0, 0 )
 mesh = SubResource( 25 )
 
 [node name="placeholder_rotor" type="MeshInstance" parent="rr"]

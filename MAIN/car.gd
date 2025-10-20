@@ -118,6 +118,8 @@ var target_gear: int
 var on_reverse: bool
 
 func _ready():
+#	Engine.time_scale /= 4
+#	Engine.iterations_per_second /= 4
 	ready = true
 	refresh_wheels()
 #	XSR_wheels(SR_wheels)
@@ -157,6 +159,8 @@ func _input(event):
 	if event.is_action_pressed("toggle_steering"):
 #		Controls = Controls as ControlSettings
 		Controls.UseMouseSteering = not Controls.UseMouseSteering
+	if event.is_action_pressed("drop"):
+		PSDB.transform.origin.y += 0.2
 	# end
 		
 
