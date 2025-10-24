@@ -117,6 +117,23 @@ var target_gear: int
 
 var on_reverse: bool
 
+var plin: Vector3
+var pain: Vector3
+
+func predict_velocity_at_position(vp: Vector3) -> Vector3:
+	vp += PSDB.transform.origin
+	var centerOfMass = to_global(PSDB.center_of_mass)
+	var velocityAtPosition = plin +pain.cross(vp - centerOfMass)
+	return velocityAtPosition
+
+func predict_impulse(p_position: Vector3, p_impulse: Vector3) -> void:
+	var _inv_mass: float = PSDB.inverse_mass
+	var _inv_inertia_tensor: Basis = get_inverse_inertia_tensor()
+	var center_of_mass: Vector3 = global_transform.basis.xform_inv(PSDB.center_of_mass)
+	
+	plin += p_impulse * _inv_mass;
+	pain += _inv_inertia_tensor.xform((p_position - center_of_mass).cross(p_impulse));
+
 func _ready():
 #	Engine.time_scale /= 4
 #	Engine.iterations_per_second /= 4
@@ -550,19 +567,18 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	var central_travel_median: float
 	var fastest_wheel: float
 	
-	if EN_DriveForceBehavior == 1:
-		var count: float
-		for wheel in wheels:
-			wheel = wheel as SVD_WHEEL # cast placeholder
-			count += wheel.DT_influence
-			drive_median += wheel.spin*wheel.DT_influence
-			central_median += wheel.spin
-			central_travel_median += wheel.MEASURE_travelled
-			fastest_wheel = max(fastest_wheel,abs(wheel.spin))
-		
-		central_median /= wheels_count
-		drive_median /= count
-		central_travel_median /= wheels_count
+	var count: float
+	for wheel in wheels:
+		wheel = wheel as SVD_WHEEL # cast placeholder
+		count += wheel.DT_influence
+		drive_median += wheel.spin*wheel.DT_influence
+		central_median += wheel.spin
+		central_travel_median += wheel.MEASURE_travelled_awd
+		fastest_wheel = max(fastest_wheel,abs(wheel.spin))
+	
+	central_median /= wheels_count
+	drive_median /= count
+	central_travel_median /= wheels_count
 	
 	var DB_SLIP: float
 	
@@ -581,6 +597,8 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 			abs_thresholded -= abs(abs(wheel.spin +wheel.MEASURE_aligning) - fastest_wheel)*wheel.Signals_ABS_Sensitivity*wheels_count/100.0
 
 	abs_thresholded = lerp(max(abs_thresholded,0),1,analog_handbrake)
+	plin = Vector3.ZERO
+	pain = Vector3.ZERO
 	for wheel in wheels:
 		wheel = wheel as SVD_WHEEL # cast placeholder
 		
@@ -645,50 +663,57 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		if wheel.df_lockto:
 			# bar
 			var diff_median: float = (wheel.spin + wheel.df_lockto.spin)/2.0
-			var diff_wheel_travel_distance: float = (wheel.MEASURE_travelled - wheel.df_lockto.MEASURE_travelled)/2.0
+			var diff_wheel_travel_distance: float = (wheel.MEASURE_travelled - wheel.df_lockto.MEASURE_travelled)
 			var diff_dampening_torque: float = wheel.spin - diff_median
+			var neighbour_diference: float = wheel.spin - wheel.df_lockto.spin
 			var diff_stabilise: float = (1.0 -(1.0/(abs(diff_median*delta*wheel.WL_size) +1)))
 			
 			var locking_torque: float = wheel.DIFF_Locking_Preload/60.0
 			if w_torque>0:
-				locking_torque += w_torque*wheel.DIFF_Locking_Power*(w_overdrive +1)
+				locking_torque += w_torque*wheel.DIFF_Locking_Power*wheel.DT_influence#*(w_overdrive +1)
 			else:
-				locking_torque -= w_torque*wheel.DIFF_Locking_Coast*rev_down_difference*(w_overdrive +1)
+				locking_torque -= w_torque*wheel.DIFF_Locking_Coast*rev_down_difference*wheel.DT_influence#*(w_overdrive +1)
 				
-			locking_torque /= w_overdrive +1
-			
+			var diff_dist: float = max(diff_wheel_travel_distance -locking_torque,0)
+			if diff_wheel_travel_distance<0:
+				diff_dist = min(diff_wheel_travel_distance +locking_torque,0)
+
 			diff_wheel_travel_distance = clamp(diff_wheel_travel_distance,-locking_torque,locking_torque)
 			diff_dampening_torque = clamp(diff_dampening_torque,-locking_torque,locking_torque)
-			
+
 			wheel.MEASURE_travelled -= diff_wheel_travel_distance*diff_stabilise
 			wheel.dt_torque -= diff_wheel_travel_distance
-			wheel.dt_torque -= diff_dampening_torque*(w_overdrive +1)
+			wheel.dt_torque -= diff_dampening_torque
+			wheel.dt_torque -= neighbour_diference*wheel.DIFF_Viscousity*delta*(w_overdrive +1)
 			
 			# central
 			var awd_diff_dampening_torque: float = diff_median - central_median
-			var awd_diff_central_travelled: float = (wheel.MEASURE_travelled + wheel.df_lockto.MEASURE_travelled)/2.0
+			var awd_diff_central_travelled: float = (wheel.MEASURE_travelled_awd + wheel.df_lockto.MEASURE_travelled_awd)/2.0
 			var awd_diff_wheel_travel_distance: float = awd_diff_central_travelled - central_travel_median
 			var awd_diff_stabilise: float = (1.0 -(1.0/(abs(central_median*delta*wheel.WL_size) +1)))
 
 			var awd_locking_torque: float = DIFF_Central_Locking_Preload/60.0
 			if w_torque>0:
-				awd_locking_torque += w_torque*DIFF_Central_Locking_Power*(w_overdrive +1)
+				awd_locking_torque += w_torque*DIFF_Central_Locking_Power#*(w_overdrive +1)
 			else:
-				awd_locking_torque -= w_torque*DIFF_Central_Locking_Coast*rev_down_difference*(w_overdrive +1)
+				awd_locking_torque -= w_torque*DIFF_Central_Locking_Coast*rev_down_difference#*(w_overdrive +1)
 
-			awd_locking_torque /= w_overdrive +1
+			var awd_diff_dist: float = max(awd_diff_wheel_travel_distance -awd_locking_torque,0)
+			if awd_diff_wheel_travel_distance<0:
+				awd_diff_dist = min(awd_diff_wheel_travel_distance +awd_locking_torque,0)
 
-			awd_diff_wheel_travel_distance = clamp(awd_diff_wheel_travel_distance,-awd_locking_torque,awd_locking_torque)
+			awd_diff_wheel_travel_distance = clamp(awd_diff_wheel_travel_distance,-awd_locking_torque, awd_locking_torque)
 			awd_diff_dampening_torque = clamp(awd_diff_dampening_torque,-awd_locking_torque,awd_locking_torque)
 
-			wheel.MEASURE_travelled -= awd_diff_wheel_travel_distance*awd_diff_stabilise
-			wheel.dt_torque -= awd_diff_wheel_travel_distance/2.0
-			wheel.dt_torque -= awd_diff_dampening_torque*(w_overdrive +1)
-			
+			wheel.MEASURE_travelled_awd -= awd_diff_wheel_travel_distance*awd_diff_stabilise
+			wheel.dt_torque -= awd_diff_wheel_travel_distance
+			wheel.dt_torque -= awd_diff_dampening_torque
+
 #		wheel.spin = 20
 		wheel.dt_braking = wheel.DT_BrakeTorque*min(wheel.DT_BrakeBias*analog_decelerate + wheel.DT_HandbrakeBias*analog_handbrake,1)*abs_thresholded
 
 		apply_impulse(wheel.impulse[0],wheel.impulse[1])
+		predict_impulse(wheel.predict_impulse[0],wheel.predict_impulse[1]/wheels_count)
 		
 		OUTPUT_total_compressed += wheel.OUTPUT_compressed
 		MEASURE_driven_wheel_radius += wheel.WL_size*wheel.DT_influence
