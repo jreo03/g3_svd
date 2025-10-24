@@ -8,7 +8,7 @@
 [ext_resource path="res://CUSTOMISE/control_schemes/gta_4_controls.res" type="Resource" id=6]
 [ext_resource path="res://ASSETS/sw.png" type="Texture" id=10]
 [ext_resource path="res://ASSETS/sw_desired.png" type="Texture" id=11]
-[ext_resource path="res://looker.gd" type="Script" id=20]
+[ext_resource path="res://ASSETS/live_cam.gd" type="Script" id=20]
 [ext_resource path="res://ASSETS/camera_cycler.gd" type="Script" id=28]
 
 [node name="Spatial" type="Spatial"]
