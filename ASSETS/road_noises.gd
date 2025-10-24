@@ -21,12 +21,12 @@ func _physics_process(delta):
 	total_rubbing = max(total_rubbing -10,0)
 	
 	$rolling.pitch_scale = 1.0 +total_rolling/1000
-	$rolling.unit_db = clamp(linear2db(max(total_rolling/1000.0,0)),-80,6)
+	$rolling.unit_db = clamp(linear2db(max(total_rolling/1000.0,0)*0.75),-80,0)
 	$rolling.max_db = $rolling.unit_db
 
-	$rub.unit_db = clamp(linear2db((max(total_rubbing-total_skidding,0))/300.0),-80,0)
+	$rub.unit_db = clamp(linear2db((max(total_rubbing-total_skidding,0) *0.75)/300.0),-80,0)
 	$rub.max_db = $rub.unit_db
 
-	$skid.unit_db = clamp(linear2db(max(total_skidding,0)/30.0),-80,6)
+	$skid.unit_db = clamp(linear2db(max(total_skidding,0)/30.0 *0.75),-80,0)
 	$skid.max_db = $skid.unit_db
 	
