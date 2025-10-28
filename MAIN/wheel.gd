@@ -73,6 +73,7 @@ var a_f_m: Array
 onready var car: RigidBody = get_parent()
 
 var spin: float = 0
+var diff_spin: float = 0
 var total_w_weight: float
 
 var HUB_pos: float
@@ -86,7 +87,7 @@ export var HUB_min_travel: float = -10.1
 export var HUB_spring_rest: float = 0.45
 onready var AN_hub: Position3D = $hub
 onready var AN_spin: Position3D = $hub/spin
-onready var AN_steer: Position3D = $hub/steer
+#onready var AN_steer: Position3D = $hub/steer
 onready var AN_fixed: Position3D = $hub/fixed
 
 var TYRE_deflated: float
@@ -191,7 +192,8 @@ func _physics_process(delta):
 	var c_point: Vector3 = global_translation +global_transform.basis.orthonormalized().xform(cast_to)
 	var c_axis: Basis
 
-
+	diff_spin = spin
+	
 	if is_colliding():
 		c_normal = get_collision_normal()
 		c_point = get_collision_point()
@@ -218,7 +220,6 @@ func _physics_process(delta):
 		var travel_angle: float = min(abs(patch_velocity.x)/(abs(spin*WL_size) +1),1)
 
 		var compressed: float = max(SUS_rest_length - HUB_pos,0)
-		var compressed_bottomed: float = max(SUS_min_length - HUB_pos,0)
 
 		var axle_vel: float = HUB_past_pos - HUB_pos
 
@@ -233,17 +234,17 @@ func _physics_process(delta):
 		var t_dampmod: float = 1
 		
 		if t_vstiff>0 and stiff>0:
-#			t_strength = min(t_vstiff/stiff,1)
 			t_strength = t_vstiff/(stiff + t_vstiff)
 			t_dampmod = max(t_vdamp/(damp + t_vdamp),delta)
 
 		var t_t: float = WL_size/2.0 - global_translation.distance_to(c_point)
+#		var t_t: float = WL_size/2.0 - global_position.distance_to(c_point) # godot 4
 		
 		var HUB_target: float = lerp(SUS_rest_length,-t_t,t_strength)
 		
 		HUB_pos = lerp(HUB_pos,HUB_target,t_dampmod)
 
-		var tyre_fell: float = max(t_t + HUB_pos -SUS_tyre_height,0)
+		var tyre_fell: float = max(t_t + HUB_pos -SUS_tyre_height,0.0)
 		
 		HUB_pos -= tyre_fell
 
@@ -251,7 +252,6 @@ func _physics_process(delta):
 
 
 		compressed = max(SUS_rest_length - HUB_pos,0)
-		compressed_bottomed = max(SUS_min_length - HUB_pos,0)
 		axle_vel = HUB_past_pos - HUB_pos
 
 		spring_force = max(0.0,compressed*stiff + damp*axle_vel)
@@ -265,13 +265,13 @@ func _physics_process(delta):
 			byproduct = (stiff/t_vstiff)/SUS_tyre_height
 			var Amaxextends: float = SUS_rest_length
 			
-			var APOS = lerp(0,Amaxextends,t_strength)
+			var APOS = lerp(0.0,Amaxextends,t_strength)
 			
 			var Atyre_fell: float = max(Amaxextends - APOS + -SUS_tyre_height,0)
 			APOS += Atyre_fell
 			
-			var As_compressed: float = max(APOS,0)
-			var As_force: float = max(As_compressed*stiff,0)
+			var As_compressed: float = max(APOS,0.0)
+			var As_force: float = max(As_compressed*stiff,0.0)
 			
 			var Abyproduct: float = (stiff/t_vstiff)/SUS_tyre_height
 			Agrip = As_force/(Atyre_fell*Abyproduct +1)
@@ -294,31 +294,23 @@ func _physics_process(delta):
 		
 		# WHEEL
 		var w_dist: float = (spin - patch_velocity.z/WL_size)
-		var predict_dist_x: float = patch_velocity.x
+		var predict_dist_x: float = patch_velocity.x/WL_size
 		var predict_slip: float
 
 		STATE_brake_locked = dt_braking>(grip*((TR_spin_resistence_rate*delta)*(dt_overdrive +1.0)))
 #		STATE_brake_locked = true
 		var predicted_grip: float = 0
 		if grip>0:
-#			predict_slip = max(sqrt(pow(abs(w_dist),2.0) + pow(abs(predict_dist_x),2.0))/(grip*((TR_spin_resistence_rate*delta)/(dt_overdrive +1.0))) -1.0,0)
 			var modifier: float = ((TR_spin_resistence_rate*delta)/(dt_overdrive +1.0))
-#			predict_slip = max(sqrt(pow(abs(w_dist/modifier),2.0) + pow(abs(predict_dist_x/modifier),2.0))/curved_grip_y -TR_MDL_slip_range_y,0)
 
 			predict_slip = max((Vector2(w_dist,predict_dist_x).length()/modifier)/curved_grip_y -1,0)
 
 			var predict_peaked: float = 1.0 -(1.0/(max(sqrt(pow(abs(w_dist),2.0) + pow(abs(predict_dist_x),2.0))/peaked_grip_y/modifier -1,0) +1.0))
-#			var predict_peaked: float = 1.0 -(1.0/(max(Vector2(w_dist/modifier,predict_dist_x/modifier).length()/peaked_grip_y -TR_MDL_slip_range_y,0) +1.0))
 			if not STATE_brake_locked:
 				var p: float = predict_slip*((predict_peaked/TR_MDL_shape_y)*TR_MDL_peak_y*(1.0-TR_MDL_linear) + TR_MDL_linear) +1.0
-#				var p: float = predict_slip +1
 				spin -= w_dist/p
 				MEASURE_aligning -= w_dist/p
 				
-#		slip_y = max(dist_y.length()/curved_grip_y -TR_MDL_slip_range_y,0)
-#		peaked_y = 1.0 -(1.0/(max(dist_y.length()/peaked_grip_y -TR_MDL_slip_range_y,0) +1.0))
-#		dist_y /= slip_y*((peaked_y/TR_MDL_shape_y)*TR_MDL_peak_y*(1.0-TR_MDL_linear) + TR_MDL_linear) +1
-
 		var t_stiff: float = lerp(t_stiff_y,t_stiff_x,pow(travel_angle,0.5))
 		var t_damp: float = lerp(t_damp_y,t_damp_x,pow(travel_angle,0.5))
 		
@@ -339,15 +331,9 @@ func _physics_process(delta):
 			standstill /= abs(spin*TR_deform_factor/1.5)/40.0 +1
 			
 		standstill += frict_mod/WL_size
-		
 		standstill = clamp(standstill,delta,1)
-			
-		if name == "rl" or name == "fl":
-			_debug.queue[" %s friction_mod" % name] = frict_mod
-			_debug.queue[" %s friction_mod_output" % name] = grip
-			_debug.queue[" %s standstill" % name] = standstill
-
-		patch_pos -= Vector3(c_axis[0].x,c_axis[0].y,c_axis[0].z)*patch_dist.x*(1.0 -standstill)
+		
+		patch_pos -= c_axis[0]*patch_dist.x*(1.0 -standstill)
 
 		var patch_slip: float
 		var patch_peaked: float
@@ -355,12 +341,10 @@ func _physics_process(delta):
 		if not STATE_brake_locked:
 			var patch_clamp_z_amount: float = b_force
 			var patch_clamp_z: float = max(abs(patch_dist.z) -patch_clamp_z_amount,0)
-
-
 			if patch_dist.z<0:
-				patch_pos += Vector3(c_axis[2].x,c_axis[2].y,c_axis[2].z)*patch_clamp_z
+				patch_pos += c_axis[2]*patch_clamp_z
 			else:
-				patch_pos -= Vector3(c_axis[2].x,c_axis[2].y,c_axis[2].z)*patch_clamp_z
+				patch_pos -= c_axis[2]*patch_clamp_z
 		
 		if grip>0:
 			patch_slip = max(patch_pos.length()/(curved_grip_y/t_stiff) -1,0)
@@ -368,13 +352,11 @@ func _physics_process(delta):
 		
 		patch_pos /= patch_slip*((patch_peaked/TR_MDL_shape)*TR_MDL_peak*(1.0-TR_MDL_linear) + TR_MDL_linear) +1
 
-#		t_stiff *= standstill
-#		t_damp *= standstill
-
 		if not STATE_brake_locked:
 			patch_pos += c_axis.z*t_force#/standstill
 		
 		var patch_dist_global: Vector3 = c_axis.xform_inv(patch_pos)
+#		var patch_dist_global: Vector3 = patch_pos*c_axis # godot 4
 
 		var p_v_off: Vector3 = patch_velocity
 		
@@ -391,19 +373,14 @@ func _physics_process(delta):
 				spin -= w_dist/(predict_slip +1)
 				MEASURE_aligning -= w_dist/(predict_slip +1)
 
-#		dist.y += ((dt_braking/hz_scale)*clamp(patch_velocity.z*t_damp,-1,1))/(TR_spin_resistence_rate/60.0)
-
 		var slip: float
 		var peaked: float
 		if grip>0:
 			slip = max(dist.length()/curved_grip -1,0)
 			peaked = 1.0 -(1.0/(max(dist.length()/peaked_grip -1,0) +1.0))
-#			if name == "rl":
-#				print(slip)
 			
 			OUTPUT_skidding = max((slip*curved_grip)*0.025*grip + (patch_slip*curved_grip)*0.05*grip,0)
 			OUTPUT_stressing = dist.length()*min(abs(spin),1)
-	
 
 		dist /= slip*((peaked/TR_MDL_shape)*TR_MDL_peak*(1.0-TR_MDL_linear) + TR_MDL_linear) +1
 
@@ -468,7 +445,6 @@ func _physics_process(delta):
 		predict_impulse = [Vector3(),Vector3()]
 		patch_pos *= 0
 		HUB_pos = SUS_rest_length
-	
 	
 	
 	p_p.translation.x = patch_pos.x*c_axis[0].x + patch_pos.y*c_axis[0].z

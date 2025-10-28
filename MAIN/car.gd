@@ -130,9 +130,11 @@ func predict_impulse(p_position: Vector3, p_impulse: Vector3) -> void:
 	var _inv_mass: float = PSDB.inverse_mass
 	var _inv_inertia_tensor: Basis = get_inverse_inertia_tensor()
 	var center_of_mass: Vector3 = global_transform.basis.xform_inv(PSDB.center_of_mass)
+#	var COM: Vector3 = PSDB.center_of_mass*global_transform.basis # godot 4
 	
 	plin += p_impulse * _inv_mass;
 	pain += _inv_inertia_tensor.xform((p_position - center_of_mass).cross(p_impulse));
+#	pain += _inv_inertia_tensor*((p_position - COM).cross(p_impulse)) # godot 4
 
 func _ready():
 #	Engine.time_scale /= 4
@@ -493,6 +495,9 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	var _tq = 1
 	var _dc = 1
 	
+	if Input.is_action_pressed("lift"):
+		PSDB.apply_central_impulse(Vector3(0,50,0))
+	
 	if EN_Torque_Curve:
 		_tq = EN_Torque_Curve.interpolate_baked(rpm_progress)
 	if EN_Decline_Curve:
@@ -522,22 +527,9 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	var test_cstab_rads: float = test_cstab*rads2rpm
 	var test_cgrip_rads: float = test_cgrip/rads2rpm
 	var test_dsweight: float = EN_RevUpSpeed/(EN_DriveForce*hz_scale)
-
+	
 	_debug.queue[" gm/s"] = linear_velocity.length()
 	_debug.queue[" gkm/h"] = int(linear_velocity.length()*3.6)
-	_debug.queue[" gs"] = (linear_velocity.length()/hz_scale - past_speed)/9.8/delta
-	_debug.queue[" gs target"] = 0.0
-	if gear == 1:
-		_debug.queue[" gs target"] = 0.619686
-	elif gear == 2:
-		_debug.queue[" gs target"] = 0.358457
-	elif gear == 3:
-		_debug.queue[" gs target"] = 0.246538
-	elif gear == 4:
-		_debug.queue[" gs target"] = 0.188477
-	elif gear == 5:
-		_debug.queue[" gs target"] = 0.143074
-	past_speed = linear_velocity.length()/hz_scale
 	var cs_rads: float = rpm/rads2rpm
 	var torque_data: Array = engine(delta,c_revup,c_revdown)
 	
@@ -558,9 +550,6 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	else:
 		for w in steer_wheels:
 			w.rotation.y = 0
-
-	$"../sw".rect_rotation = -steer_output*420
-	$"../sw_desired".rect_rotation = -steer_input*420
 
 	var drive_median: float
 	var central_median: float
@@ -596,7 +585,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		if wheel.Signals_ABS:
 			abs_thresholded -= abs(abs(wheel.spin +wheel.MEASURE_aligning) - fastest_wheel)*wheel.Signals_ABS_Sensitivity*wheels_count/100.0
 
-	abs_thresholded = lerp(max(abs_thresholded,0),1,analog_handbrake)
+	abs_thresholded = lerp(max(abs_thresholded,0.0),1.0,analog_handbrake)
 	plin = Vector3.ZERO
 	pain = Vector3.ZERO
 	for wheel in wheels:
@@ -607,15 +596,11 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		var w_torque_est: float = (torque_data[1]*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
 		w_torque_est = min(w_torque_est,test_cgrip_rads*test_dsweight)
 		
-#		w_torque_est /= torque_data[1]*delta
-		
 		var w_overdrive: float = max(w_torque_est/(torque_data[1]/(g_ratio/hz_scale)) -1.0,0)
-#		w_overdrive = 10
 
 		var weighed_grip: float = (test_cgrip_rads*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
 
 		var c_grip_od: float = test_cgrip_rads/(1.0/(w_overdrive/wheel.TR_spin_resistence_rate +1))
-#		var c_grip_od: float = weighed_grip/(1.0/(w_overdrive +1))
 		var acceleration: float = clamp(torque_data[0],-c_grip_od,c_grip_od)
 
 		var dt_dist: float
@@ -645,20 +630,13 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		var od_red: float = max(abs(align_t/rads2rpm) -w_torque_est/rads2rpm,0)
 		
 		wheel.dt_overdrive = w_overdrive
-#		wheel.dt_overdrive = 1
-		if wheel.name == "rl":
-			_debug.queue[" dt_dist"] = dt_dist
-			_debug.queue[" w_overdrive"] = w_overdrive
 
 		var w_torque: float = (align_t*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
-#		w_torque = clamp(w_torque,-test_cgrip_rads,test_cgrip_rads)
 
 		if gear<0:
 			wheel.dt_torque = -w_torque
 		else:
 			wheel.dt_torque = w_torque
-			
-		
 			
 		if wheel.df_lockto:
 			# bar
@@ -681,6 +659,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 			diff_wheel_travel_distance = clamp(diff_wheel_travel_distance,-locking_torque,locking_torque)
 			diff_dampening_torque = clamp(diff_dampening_torque,-locking_torque,locking_torque)
 
+			wheel.MEASURE_travelled -= diff_dist
 			wheel.MEASURE_travelled -= diff_wheel_travel_distance*diff_stabilise
 			wheel.dt_torque -= diff_wheel_travel_distance
 			wheel.dt_torque -= diff_dampening_torque
@@ -705,6 +684,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 			awd_diff_wheel_travel_distance = clamp(awd_diff_wheel_travel_distance,-awd_locking_torque, awd_locking_torque)
 			awd_diff_dampening_torque = clamp(awd_diff_dampening_torque,-awd_locking_torque,awd_locking_torque)
 
+			wheel.MEASURE_travelled_awd -= awd_diff_dist
 			wheel.MEASURE_travelled_awd -= awd_diff_wheel_travel_distance*awd_diff_stabilise
 			wheel.dt_torque -= awd_diff_wheel_travel_distance
 			wheel.dt_torque -= awd_diff_dampening_torque
