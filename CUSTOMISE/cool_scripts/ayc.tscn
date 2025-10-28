@@ -1,0 +1,50 @@
+[gd_scene load_steps=2 format=2]
+
+[sub_resource type="GDScript" id=1]
+resource_name = "ayc"
+script/source = "extends Node
+
+var ready: bool
+
+var lw: Array
+var rw: Array
+
+onready var car: SVD_BODY = get_parent()
+
+# AYC stands for Active Yaw Control, introduced by Mitsubishi
+# this is loosely recreated all-wheel drive system
+
+export(Array, NodePath) var left_wheels: Array setget xfw
+func xfw(val: Array):
+	left_wheels = val
+	lw = []
+	if not ready:
+		yield(self,\"ready\")
+	for i in val:
+		lw.append(get_node(i))
+
+export(Array, NodePath) var right_wheels: Array setget xrw
+func xrw(val: Array):
+	right_wheels = val
+	rw = []
+	if not ready:
+		yield(self,\"ready\")
+	for i in val:
+		rw.append(get_node(i))
+		
+func _ready():
+	ready = true
+
+
+func _physics_process(delta):
+	for i in lw:
+		i.DT_influence = 1.0 - pow(abs(max(car.steer_output,0)),0.5)
+		_debug.queue[\" lefts\"] = i.DT_influence
+	
+	for i in rw:
+		i.DT_influence = 1.0 - pow(abs(min(car.steer_output,0)),0.5)
+		_debug.queue[\" rights\"] = i.DT_influence
+"
+
+[node name="active_yaw_control" type="Node"]
+script = SubResource( 1 )

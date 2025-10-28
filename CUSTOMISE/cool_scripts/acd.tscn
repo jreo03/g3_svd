@@ -1,0 +1,67 @@
+[gd_scene load_steps=2 format=2]
+
+[sub_resource type="GDScript" id=1]
+resource_name = "acd"
+script/source = "extends Node
+
+var ready: bool
+
+var fw: Array
+var rw: Array
+
+onready var car: SVD_BODY = get_parent()
+
+# ACD stands for Active Centre Differential
+# this is loosely recreated all-wheel drive system
+
+export(Array, NodePath) var front_wheels: Array setget xfw
+func xfw(val: Array):
+	front_wheels = val
+	fw = []
+	if not ready:
+		yield(self,\"ready\")
+	for i in val:
+		fw.append(get_node(i))
+
+export(Array, NodePath) var rear_wheels: Array setget xrw
+func xrw(val: Array):
+	rear_wheels = val
+	rw = []
+	if not ready:
+		yield(self,\"ready\")
+	for i in val:
+		rw.append(get_node(i))
+		
+func _ready():
+	ready = true
+
+
+func _physics_process(delta):
+	var f_median: float
+	var r_median: float
+	
+	for i in fw:
+		f_median += i.spin
+	f_median /= fw.size()
+	
+	for i in rw:
+		r_median += i.spin
+	r_median /= rw.size()
+	
+	var diff: float = f_median - r_median
+	
+	car.DIFF_Central_Locking_Power = clamp(diff,0.0,1.0)
+	car.DIFF_Central_Locking_Coast = clamp(diff,0.0,1.0)
+	
+	for i in fw:
+		i.DT_influence = clamp(1.0 -(max(diff,0)*0.5 +abs(car.steer_input)*0.5 ),.0,1.0)
+	
+	_debug.queue[\" awd differential\"] = diff
+	_debug.queue[\" awd locking\"] = car.DIFF_Central_Locking_Power
+	_debug.queue[\" fwd power\"] = fw[0].DT_influence
+	
+	
+"
+
+[node name="active_centre_differential" type="Node"]
+script = SubResource( 1 )
