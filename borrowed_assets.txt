@@ -1,9 +1,14 @@
 ============Racer.nl============
 \labs\tyre_curving\pacejka graph.jpg
 
-============Need For Speed Underground 1 © 2003-present Electronic Arts============
+============Need for Speed Underground 1 © 2003-present Electronic Arts============
 \ASSETS\engine0off.ogg
 \ASSETS\engine0on.ogg
+============Need for Speed Underground 2 © 2004-present Electronic Arts============
+\labs\integra.tscn -> sample
+\labs\integra_dcl.tscn -> sample
+\labs\rework.tscn -> sample
+\labs\rework_dcl.tscn -> sample
 
 ============Live for Speed © 2002-present Scawen Roberts, Eric Bailey, Victor van Vlaardingen============
 \ASSETS\LFS_road_noise.wav
