@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=2]
+[gd_scene load_steps=26 format=2]
 
 [ext_resource path="res://ASSETS/maps/RCP Proving Grounds/assets/rock2_hd.png" type="Texture" id=1]
 [ext_resource path="res://ASSETS/maps/RCP Proving Grounds/assets/roadsurfaceunmarked.jpg" type="Texture" id=2]
@@ -7,6 +7,10 @@
 [ext_resource path="res://ASSETS/maps/RCP Proving Grounds/assets/dirt.png" type="Texture" id=5]
 [ext_resource path="res://ASSETS/maps/RCP Proving Grounds/assets/cobbles.png" type="Texture" id=6]
 [ext_resource path="res://ASSETS/maps/RCP Proving Grounds/assets/roadsurface.png" type="Texture" id=7]
+[ext_resource path="res://MAIN/surface_properties_holder.gd" type="Script" id=8]
+[ext_resource path="res://MAIN/resources/surface_presets/asphalt.tres" type="Resource" id=9]
+[ext_resource path="res://MAIN/resources/surface_presets/grass.tres" type="Resource" id=10]
+[ext_resource path="res://MAIN/resources/surface_presets/gravel.tres" type="Resource" id=11]
 
 [sub_resource type="SpatialMaterial" id=23]
 albedo_texture = ExtResource( 1 )
@@ -168,6 +172,8 @@ mesh = SubResource( 37 )
 skeleton = NodePath("../..")
 
 [node name="StaticBody" type="StaticBody" parent="map"]
+script = ExtResource( 8 )
+surface_properties = ExtResource( 9 )
 
 [node name="CollisionShape" type="CollisionShape" parent="map/StaticBody"]
 shape = SubResource( 38 )
@@ -178,6 +184,8 @@ mesh = SubResource( 39 )
 skeleton = NodePath("../..")
 
 [node name="StaticBody" type="StaticBody" parent="map2"]
+script = ExtResource( 8 )
+surface_properties = ExtResource( 10 )
 
 [node name="CollisionShape" type="CollisionShape" parent="map2/StaticBody"]
 shape = SubResource( 40 )
@@ -188,6 +196,8 @@ mesh = SubResource( 41 )
 skeleton = NodePath("../..")
 
 [node name="StaticBody" type="StaticBody" parent="map3"]
+script = ExtResource( 8 )
+surface_properties = ExtResource( 11 )
 
 [node name="CollisionShape" type="CollisionShape" parent="map3/StaticBody"]
 shape = SubResource( 42 )
