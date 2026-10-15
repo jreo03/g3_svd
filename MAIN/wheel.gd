@@ -527,6 +527,9 @@ func _physics_process(delta):
 	
 		c_axis = Basis(c_normal.cross(SR_alignment_axis.global_transform.basis.z), c_normal, SR_alignment_axis.global_transform.basis.x.cross(c_normal)).orthonormalized()
  
+		c_v.global_translation = c_point
+		c_v.global_transform.basis = c_axis
+		
 		var world_offsetted: Vector3 = c_v.global_translation - car.global_translation
 		var patch_global_velocity: Vector3 = psdb.get_velocity_at_local_position(world_offsetted)
 		patch_global_velocity += (SR_contact_ref.global_translation - SR_difference_ref.global_translation)/delta
@@ -548,9 +551,6 @@ func _physics_process(delta):
 
 		real_brake += min(SP_roll_resist*abs(spin) + SP_roll_resist_constant, SP_max_roll_resist)
 
-		c_v.global_translation = c_point
-		c_v.global_transform.basis = c_axis
-		
 		var spring_force: float
 		var t_stiff_y: float = TR_elasticity
 		var t_damp_y: float = TR_dampening
