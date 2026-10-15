@@ -621,7 +621,8 @@ func _physics_process(delta):
 		var bottomed_axle_vel: float = past_point - c_point_dist
 		past_point = c_point_dist
 		
-#		axle_vel = -patch_velocity.y*delta
+		if SUS_damper_behaviour == 1:
+			axle_vel = -patch_velocity.y*delta
 		
 		var AR_hub_difference_vel: float = AR_hub_difference - AR_hub_difference_past
 		
