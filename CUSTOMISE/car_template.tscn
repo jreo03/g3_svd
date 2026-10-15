@@ -1,25 +1,21 @@
-[gd_scene load_steps=35 format=2]
+[gd_scene load_steps=38 format=2]
 
 [ext_resource path="res://CUSTOMISE/control_schemes/default_controls.res" type="Resource" id=1]
-[ext_resource path="res://ASSETS/engine0off.ogg" type="AudioStream" id=2]
+[ext_resource path="res://ASSETS/debug_engine_sound/debug_engine_sound.tscn" type="PackedScene" id=2]
 [ext_resource path="res://MAIN/wheel.tscn" type="PackedScene" id=3]
 [ext_resource path="res://MAIN/car.gd" type="Script" id=4]
 [ext_resource path="res://CUSTOMISE/tyre_models/faux_pacejka_mf.tres" type="Resource" id=5]
-[ext_resource path="res://ASSETS/engine0on.ogg" type="AudioStream" id=6]
+[ext_resource path="res://CUSTOMISE/addons/torque_curve.tscn" type="PackedScene" id=6]
 [ext_resource path="res://ASSETS/LFS_road_noise.wav" type="AudioStream" id=7]
-[ext_resource path="res://ASSETS/scraping.ogg" type="AudioStream" id=8]
+[ext_resource path="res://ASSETS/inertia_adjuster.gd" type="Script" id=8]
 [ext_resource path="res://ASSETS/LFS_tyre_rub.wav" type="AudioStream" id=9]
 [ext_resource path="res://ASSETS/LFS_tyre_skid.wav" type="AudioStream" id=10]
 [ext_resource path="res://ASSETS/road_noises.gd" type="Script" id=11]
+[ext_resource path="res://ASSETS/offroad.ogg" type="AudioStream" id=12]
+[ext_resource path="res://MAIN/resources/surface_presets/asphalt.tres" type="Resource" id=13]
 
 [sub_resource type="PhysicsMaterial" id=33]
 friction = 0.0
-
-[sub_resource type="Curve" id=31]
-_data = [ Vector2( 0, 0.571591 ), 0.0, 1.98636, 0, 0, Vector2( 0.402256, 1 ), 0.0, 0.0, 0, 0, Vector2( 0.552632, 0.907955 ), 0.0, 0.0, 0, 0, Vector2( 1, 0.798864 ), -1.20909, 0.0, 0, 0 ]
-
-[sub_resource type="Curve" id=32]
-_data = [ Vector2( 0, 0.332955 ), 0.0, 0.667045, 0, 1, Vector2( 1, 1 ), 0.667045, 0.0, 1, 0 ]
 
 [sub_resource type="SpatialMaterial" id=13]
 albedo_color = Color( 0.7, 0, 0, 1 )
@@ -297,6 +293,18 @@ surfaces/0 = {
 "vertex_count": 75
 }
 
+[sub_resource type="SphereShape" id=38]
+radius = 0.306
+
+[sub_resource type="SpatialMaterial" id=35]
+flags_unshaded = true
+flags_no_depth_test = true
+albedo_color = Color( 0.501961, 0, 1, 1 )
+
+[sub_resource type="CubeMesh" id=36]
+material = SubResource( 35 )
+size = Vector3( 0.1, 0.1, 0.1 )
+
 [sub_resource type="ConvexPolygonShape" id=6]
 points = PoolVector3Array( 0.835, 0.744, 1.778, 0.835, 0, 1.778, 0.835, 0.744, -1.966, -0.835, 0.744, 1.778, -0.835, 0, 1.778, 0.835, 0, -1.966, -0.835, 0.744, -1.966, -0.835, 0, -1.966 )
 
@@ -306,41 +314,54 @@ mass = 1000.0
 physics_material_override = SubResource( 33 )
 custom_integrator = true
 can_sleep = false
-linear_damp = 0.0
+linear_damp = 0.29
 angular_damp = 0.0
 script = ExtResource( 4 )
 Controls = ExtResource( 1 )
 EN_DriveForceBehavior = 1
-EN_Torque_Curve = SubResource( 31 )
-EN_Decline_Curve = SubResource( 32 )
-SR_pivot_point = 0.0
-SR_pivot_node = NodePath("rl")
+SR_pivot_node = NodePath("ackermann node")
 SR_wheels = [ NodePath("fl"), NodePath("fr") ]
+
+[node name="torque_curve" parent="." instance=ExtResource( 6 )]
+Max_DriveForce = 150.0
 
 [node name="placeholder" type="MeshInstance" parent="."]
 transform = Transform( 0.306, 0, 0, 0, 0.306, 0, 0, 0, 0.306, 0, -0.316402, 0 )
 mesh = SubResource( 21 )
 
 [node name="fl" parent="." instance=ExtResource( 3 )]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, 1.151 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.3, 1.151 )
+SUS_shapecast_node = NodePath("ShapeCast")
+SUS_shapecast_compression_mode = 1
+SUS_shapecast_hq_detection = true
 SUS_spring_stiffness = 42.0
 SUS_dampening = 4.1
-SUS_rest_length = 0.28
+SUS_compression_length = 0.48
+SUS_rest_height = 0.07
+SUS_max_compression_length = 0.13
 SUS_tyre_stiffness = 120.0
 SUS_tyre_damp = 4.0
 SUS_tyre_height = 0.087
-TR_Tire_Model = ExtResource( 5 )
+SR_Contact_Patch_Conditioning = true
+SR_Steering_Pivot_Offset = Vector3( -0.1, 0, 0 )
+SR_Steering_Caster_Angles = Vector3( -5, 0, 0 )
+TR_Model = ExtResource( 5 )
+TR_vertical_softness = true
+TR_elasticity_physics = true
+TR_elasticity = 1000.0
+TR_dampening = 5.0
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
-DT_BrakeTorque = 30.0
 DT_BrakeBias = 0.8
-curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+AR_swaybar_link = NodePath("../fr")
+AR_swaybar_stiffness = 9.0
+AR_swaybar_dampening = 0.4
 DIFF_lock_to = NodePath("../fr")
-DIFF_Locking_Preload = 10.0
+DIFF_Locking_Preload = 20.0
 DIFF_Locking_Power = 0.2
-DIFF_Locking_Coast = 0.2
+DIFF_Locking_Coast = 0.1
 DIFF_Viscousity = 0.0
 
 [node name="placeholder_wheel" type="MeshInstance" parent="fl"]
@@ -355,26 +376,47 @@ mesh = SubResource( 28 )
 transform = Transform( 0.244, 0, 0, 0, 0.172534, -0.172534, 0, 0.172534, 0.172534, -0.053012, -1.19209e-07, 0 )
 mesh = SubResource( 30 )
 
+[node name="ShapeCast" type="ShapeCast" parent="fl"]
+shape = SubResource( 38 )
+target_position = Vector3( 0, 0, 0 )
+
+[node name="_touches" type="MeshInstance" parent="fl"]
+visible = false
+mesh = SubResource( 36 )
+
 [node name="fr" parent="." instance=ExtResource( 3 )]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, 1.151 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.3, 1.151 )
+SUS_shapecast_node = NodePath("ShapeCast")
+SUS_shapecast_compression_mode = 1
+SUS_shapecast_hq_detection = true
 SUS_spring_stiffness = 42.0
 SUS_dampening = 4.1
-SUS_rest_length = 0.28
+SUS_compression_length = 0.48
+SUS_rest_height = 0.07
+SUS_max_compression_length = 0.13
 SUS_tyre_stiffness = 120.0
 SUS_tyre_damp = 4.0
 SUS_tyre_height = 0.087
-TR_Tire_Model = ExtResource( 5 )
+SR_Contact_Patch_Conditioning = true
+SR_Steering_Pivot_Offset = Vector3( 0.1, 0, 0 )
+SR_Steering_Caster_Angles = Vector3( -5, 0, 0 )
+TR_Model = ExtResource( 5 )
+TR_vertical_softness = true
+TR_elasticity_physics = true
+TR_elasticity = 1000.0
+TR_dampening = 5.0
 Signals_ABS = true
 Signals_ABS_Sensitivity = 0.4
-DT_BrakeTorque = 30.0
 DT_BrakeBias = 0.8
-curb_step_behaviour = 0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+AR_swaybar_link = NodePath("../fl")
+AR_swaybar_stiffness = 9.0
+AR_swaybar_dampening = 0.4
 DIFF_lock_to = NodePath("../fl")
-DIFF_Locking_Preload = 10.0
+DIFF_Locking_Preload = 20.0
 DIFF_Locking_Power = 0.2
-DIFF_Locking_Coast = 0.2
+DIFF_Locking_Coast = 0.1
 DIFF_Viscousity = 0.0
 
 [node name="placeholder_wheel" type="MeshInstance" parent="fr"]
@@ -389,23 +431,43 @@ mesh = SubResource( 28 )
 transform = Transform( -0.244, 0, 0, 0, 0.172534, -0.172534, 0, 0.172534, 0.172534, 0.053, 0, 0 )
 mesh = SubResource( 30 )
 
+[node name="ShapeCast" type="ShapeCast" parent="fr"]
+transform = Transform( -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0 )
+shape = SubResource( 38 )
+target_position = Vector3( 0, 0, 0 )
+
+[node name="_touches" type="MeshInstance" parent="fr"]
+visible = false
+mesh = SubResource( 36 )
+
 [node name="rl" parent="." instance=ExtResource( 3 )]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.0425687, -1.151 )
-SUS_dampening = 4.0
-SUS_rest_length = 0.28
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.725, -0.3, -1.151 )
+Toe = 0.1
+SUS_shapecast_node = NodePath("ShapeCast")
+SUS_shapecast_compression_mode = 1
+SUS_shapecast_hq_detection = true
+SUS_dampening = 3.7
+SUS_compression_length = 0.48
+SUS_rest_height = 0.07
+SUS_max_compression_length = 0.13
 SUS_tyre_stiffness = 120.0
 SUS_tyre_damp = 4.0
 SUS_tyre_height = 0.087
-TR_Tire_Model = ExtResource( 5 )
-Signals_ABS = true
+SR_Contact_Patch_Conditioning = true
+TR_Model = ExtResource( 5 )
+TR_vertical_softness = true
+TR_elasticity_physics = true
+TR_elasticity = 1000.0
+TR_dampening = 5.0
 Signals_ABS_Sensitivity = 0.4
 DT_influence = 0.0
-DT_BrakeTorque = 30.0
-DT_HandbrakeBias = 1.0
 DT_BrakeBias = 0.2
-curb_step_behaviour = 0
+DT_HandbrakeBias = 1.0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+AR_swaybar_link = NodePath("../rr")
+AR_swaybar_stiffness = 4.0
+AR_swaybar_dampening = 0.1
 DIFF_lock_to = NodePath("../rr")
 DIFF_Viscousity = 0.0
 
@@ -421,23 +483,43 @@ mesh = SubResource( 28 )
 transform = Transform( 0.244, 0, 0, 0, 7.45058e-09, -0.244, 0, 0.244, 7.45058e-09, -0.053012, -1.19209e-07, 0 )
 mesh = SubResource( 30 )
 
+[node name="ShapeCast" type="ShapeCast" parent="rl"]
+transform = Transform( -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0 )
+shape = SubResource( 38 )
+target_position = Vector3( 0, 0, 0 )
+
+[node name="_touches" type="MeshInstance" parent="rl"]
+visible = false
+mesh = SubResource( 36 )
+
 [node name="rr" parent="." instance=ExtResource( 3 )]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.0429997, -1.151 )
-SUS_dampening = 4.0
-SUS_rest_length = 0.28
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -0.725, -0.3, -1.151 )
+Toe = 0.1
+SUS_shapecast_node = NodePath("ShapeCast")
+SUS_shapecast_compression_mode = 1
+SUS_shapecast_hq_detection = true
+SUS_dampening = 3.7
+SUS_compression_length = 0.48
+SUS_rest_height = 0.07
+SUS_max_compression_length = 0.13
 SUS_tyre_stiffness = 120.0
 SUS_tyre_damp = 4.0
 SUS_tyre_height = 0.087
-TR_Tire_Model = ExtResource( 5 )
-Signals_ABS = true
+SR_Contact_Patch_Conditioning = true
+TR_Model = ExtResource( 5 )
+TR_vertical_softness = true
+TR_elasticity_physics = true
+TR_elasticity = 1000.0
+TR_dampening = 5.0
 Signals_ABS_Sensitivity = 0.4
 DT_influence = 0.0
-DT_BrakeTorque = 30.0
-DT_HandbrakeBias = 1.0
 DT_BrakeBias = 0.2
-curb_step_behaviour = 0
+DT_HandbrakeBias = 1.0
 AN_spinning_meshes = [ NodePath("placeholder_wheel"), NodePath("placeholder_rotor") ]
 AN_fixed_meshes = [ NodePath("placeholder_caliper") ]
+AR_swaybar_link = NodePath("../rl")
+AR_swaybar_stiffness = 4.0
+AR_swaybar_dampening = 0.1
 DIFF_lock_to = NodePath("../rl")
 DIFF_Viscousity = 0.0
 
@@ -453,31 +535,24 @@ mesh = SubResource( 28 )
 transform = Transform( -0.244, 0, 0, 0, 7.45058e-09, -0.244, 0, 0.244, 7.45058e-09, 0.053, 0, 0 )
 mesh = SubResource( 30 )
 
+[node name="ShapeCast" type="ShapeCast" parent="rr"]
+transform = Transform( -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, 0, 0, 0 )
+shape = SubResource( 38 )
+target_position = Vector3( 0, 0, 0 )
+
+[node name="_touches" type="MeshInstance" parent="rr"]
+visible = false
+mesh = SubResource( 36 )
+
 [node name="CollisionShape" type="CollisionShape" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0.1 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0.2 )
 shape = SubResource( 6 )
-
-[node name="enon" type="AudioStreamPlayer3D" parent="."]
-stream = ExtResource( 6 )
-unit_size = 10.0
-max_db = 0.0
-autoplay = true
-attenuation_filter_db = 0.0
-
-[node name="DB_clutchslip" type="AudioStreamPlayer3D" parent="."]
-stream = ExtResource( 8 )
-max_db = 0.0
-attenuation_filter_db = 0.0
-
-[node name="enoff" type="AudioStreamPlayer3D" parent="."]
-stream = ExtResource( 2 )
-unit_size = 10.0
-max_db = 0.0
-autoplay = true
-attenuation_filter_db = 0.0
+script = ExtResource( 8 )
+i_scale = 1.125
 
 [node name="road_noises" type="Spatial" parent="."]
 script = ExtResource( 11 )
+asphalt_materials = [ ExtResource( 13 ) ]
 
 [node name="rolling" type="AudioStreamPlayer3D" parent="road_noises"]
 stream = ExtResource( 7 )
@@ -499,3 +574,22 @@ unit_size = 10.0
 max_db = 0.0
 autoplay = true
 attenuation_filter_db = 0.0
+
+[node name="offroad_roll" type="AudioStreamPlayer3D" parent="road_noises"]
+stream = ExtResource( 12 )
+unit_size = 10.0
+max_db = 0.0
+autoplay = true
+attenuation_filter_db = 0.0
+
+[node name="offroad_skid" type="AudioStreamPlayer3D" parent="road_noises"]
+stream = ExtResource( 12 )
+unit_size = 10.0
+max_db = 0.0
+autoplay = true
+attenuation_filter_db = 0.0
+
+[node name="debug_engine_sound" parent="." instance=ExtResource( 2 )]
+
+[node name="ackermann node" type="Position3D" parent="."]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.151 )

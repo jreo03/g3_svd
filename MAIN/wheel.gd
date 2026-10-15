@@ -110,6 +110,7 @@ func xtr_mdl(val: SVD_TMODEL):
 
 export var TR_vertical_softness: bool
 export var TR_elasticity_physics: bool
+export var TR_simplified: bool
 export var TR_stiffness: float = 40
 export var TR_deform_factor: float = 1
 export var TR_deform_threshold: float = 1
@@ -147,7 +148,7 @@ var SP_dampening: float
 var STATE_surface_checked: bool
 
 export(float, 0, 1) var DT_influence: float = 1
-export var DT_BrakeTorque: float = 5
+export var DT_BrakeTorque: float = 5000
 export(float, 0, 1) var DT_BrakeBias: float = 1
 export(float, 0, 1) var DT_HandbrakeBias: float = 0
 #export(int, "Bump", "Absorb") var curb_step_behaviour = 1
@@ -300,7 +301,7 @@ var psdb: PhysicsDirectBodyState
 func _physics_process(delta):
 	if not car.PSDB:
 		return
-		
+	
 	var radius_mod: float = WL_radius
 	var added_rest: float = SUS_compression_length + SUS_rest_height
 	var comp_max_pos: float = SUS_compression_length - SUS_max_compression_length
@@ -315,6 +316,7 @@ func _physics_process(delta):
 	
 	var real_torque: float = dt_torque
 	var real_brake: float = dt_braking
+	var real_dt_overdrive: float = dt_overdrive#/(delta*(TR_spin_resistence_rate/60.0))
 	
 	if dt_braking>0:
 		real_torque -= real_torque/max(abs(real_torque)/dt_braking,1)
@@ -324,9 +326,15 @@ func _physics_process(delta):
 	else:
 		real_brake = clamp(dt_braking + dt_torque, 0, dt_braking)
 
+	_debug.queue["%s dt_torque" % name] = dt_torque
+	_debug.queue["%s dt_braking" % name] = dt_braking
 #	_debug.queue["%s real_torque" % name] = real_torque
 #	_debug.queue["%s real_brake" % name] = real_brake
+	_debug.queue["%s dt_overdrive" % name] = dt_overdrive
 #	_debug.queue["%s OUTPUT_aligned_spin" % name] = OUTPUT_aligned_spin
+
+	real_torque *= delta*(TR_spin_resistence_rate/60.0)
+	real_brake *= delta*(TR_spin_resistence_rate/60.0)
 
 #	work needed
 #	if dt_torque>0:
@@ -341,14 +349,14 @@ func _physics_process(delta):
 #		real_brake = max(dt_braking +dt_torque, 0)
 
 	var hz_scale: float = delta*60.0
-	spin += real_torque/(dt_overdrive +1.0)
+	spin += real_torque/(real_dt_overdrive +1.0)
 	spin += dt_substantialtorque
 	MEASURE_aligning += dt_substantialtorque
 	if real_brake>0:
-		spin -= spin/max(abs(spin)/(real_brake/(dt_overdrive +1.0)),1)
-		MEASURE_aligning -= spin/max(abs(spin)/(real_brake/(dt_overdrive +1.0)),1)
+		spin -= spin/max(abs(spin)/(real_brake/(real_dt_overdrive +1.0)),1)
+		MEASURE_aligning -= spin/max(abs(spin)/(real_brake/(real_dt_overdrive +1.0)),1)
 		
-	var thing: float = 1.0/(dt_overdrive +1.0)
+	var thing: float = 1.0/(real_dt_overdrive +1.0)
 	
 	var real_wheelsize: float = WL_radius
 	
@@ -679,11 +687,11 @@ func _physics_process(delta):
 		var predict_dist_x: float = patch_velocity.x/radius_mod
 		var predict_slip: float
 
-		STATE_brake_locked = real_brake>(grip*((TR_spin_resistence_rate*delta)*(dt_overdrive +1.0)))
+		STATE_brake_locked = real_brake>(grip*((TR_spin_resistence_rate*delta)))
 #		STATE_brake_locked = true
 		var predicted_grip: float = 0
 		if grip>0:
-			var modifier: float = ((TR_spin_resistence_rate*delta)/(dt_overdrive +1.0))
+			var modifier: float = ((TR_spin_resistence_rate*delta)/(real_dt_overdrive +1.0))
 
 			predict_slip = max((Vector2(w_dist,predict_dist_x).length()/modifier)/curved_grip_y -1,0)
 
@@ -749,6 +757,7 @@ func _physics_process(delta):
 			var spin_difference: float = (spin - patch_velocity.z/radius_mod)
 			var spin_thrust: float = spin_difference*standstill/radius_mod
 
+
 			if not STATE_brake_locked:
 				if (spin_difference + real_torque)>0:
 					spin_thrust = max(spin_thrust, real_torque)
@@ -762,7 +771,7 @@ func _physics_process(delta):
 			var patch_dist_global: Vector3 = c_axis.xform_inv(patch_pos)
 	#		var patch_dist_global: Vector3 = patch_pos*c_axis # godot 4
 			
-#			_debug.queue["%s spin_difference" % name] = spin_difference
+			_debug.queue["%s STATE_brake_locked" % name] = STATE_brake_locked
 			
 			dist = Vector3(
 				p_v_off.x*t_damp*standstill -patch_dist_global.x*t_stiff,
@@ -775,15 +784,25 @@ func _physics_process(delta):
 			var ne_t_force: float = (real_torque/(t_response*delta))/(TR_spin_resistence_rate)
 			var braked: float
 
-			if not STATE_brake_locked:
+			if TR_simplified:
 				var patch_clamp_z_amount: float = ne_b_force
 				braked = clamp(-patch_velocity.z,-patch_clamp_z_amount,patch_clamp_z_amount)
-
-			dist = Vector3(
-				p_v_off.x*t_response*standstill,
-				0,
-				(p_v_off.z - spin*radius_mod)*t_response*standstill -ne_t_force*t_response  -braked*t_response
-				)
+			
+				dist = Vector3(
+					p_v_off.x*t_response*standstill,
+					0,
+					-ne_t_force*t_response  -braked*t_response
+					)
+			else:
+				if not STATE_brake_locked:
+					var patch_clamp_z_amount: float = ne_b_force
+					braked = clamp(-patch_velocity.z,-patch_clamp_z_amount,patch_clamp_z_amount)
+				
+				dist = Vector3(
+					p_v_off.x*t_response*standstill,
+					0,
+					(p_v_off.z - spin*radius_mod)*t_response*standstill -ne_t_force*t_response  -braked*t_response
+					)
 
 
 		if grip>0:

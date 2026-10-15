@@ -32,7 +32,7 @@ export var Controls: Resource
 export var GPS_Start_on_Ready: bool
 
 #export var EN_Realistic_Behaviour: bool
-export var EN_DriveForce: float = 10
+export var EN_DriveForce: float = 150
 export(int, "Wheels Synced", "Wheels Unsynced") var EN_DriveForceBehavior
 export var EN_RevUpSpeed: float = 150
 export var EN_RevDownSpeed: float = 50
@@ -44,6 +44,8 @@ export var EN_StallRate: float = 2
 export var EN_CanStall: bool = false
 export var EN_CanOverRev: bool = false
 export var EN_StallPrevention: float = 1
+
+# delta*(TR_spin_resistence_rate/60.0)
 
 #export var EN_MaxTorque: float = 150
 #export var EN_ClutchGrip: float = 187.5 # 150*1.25
@@ -308,7 +310,7 @@ func engine(dt: float, b_revup: float, b_revdown: float) -> Array:
 
 	rpm_scaled = (rpm -EN_IdleRPM)/(EN_MaxRPM -EN_IdleRPM)
 
-	return [torque_measure/rads2rpm,max(c_revup,c_revdown)/rads2rpm,torque_measure]
+	return [torque_measure/rads2rpm, max(c_revup,c_revdown)/rads2rpm, torque_measure]
 
 func controls(d_scale):
 	
@@ -504,7 +506,7 @@ func controls(d_scale):
 		var up_target: int = 1
 		var down_target: int = 1
 		for i in GB_ForwardGearRatios:
-			var iratio: float = i*GB_FinalDriveRatio*4.0
+			var iratio: float = i*GB_FinalDriveRatio*2.0
 			var ok: float = upshift_point/iratio
 			var not_ok: float = downshift_point/iratio
 			
@@ -572,7 +574,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	
 	if Input.is_action_pressed("lift"):
 #		PSDB.apply_central_impulse(Vector3(0,50,0))
-		PSDB.angular_velocity.z = -1
+		PSDB.linear_velocity.y = 1
 #	else:
 #		PSDB.linear_velocity.y = -0.05
 	if Input.is_action_pressed("DB_press"):
@@ -602,7 +604,8 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 #	var test_dsweight: float = 15.0/hz_scale/EN_CrankshaftWeight
 #	if !EN_Realistic_Behaviour:
 #		test_dsweight = EN_RevUpSpeed/(EN_DriveForce*hz_scale)
-	var test_dsweight: float = EN_RevUpSpeed*0.345/(EN_DriveForce*hz_scale)
+	var test_dsweight: float = EN_RevUpSpeed/(EN_DriveForce*hz_scale)
+	test_dsweight /= rads2rpm
 	
 	plane_speed = Vector2(linear_velocity.x,linear_velocity.z)
 
@@ -624,7 +627,7 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	past_speed = linear_velocity.length()/hz_scale
 	past_plane_speed = plane_speed.length()/hz_scale
 	var cs_rads: float = rpm/rads2rpm
-	var torque_data: Array = engine(delta,c_revup,c_revdown)
+	var torque_data: Array = engine(delta, c_revup, c_revdown)
 	
 	rt_dsweight = max(rt_dsweight,1)
 	
@@ -703,17 +706,24 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 	for wheel in wheels:
 		wheel = wheel as SVD_WHEEL # cast placeholder
 		
+		
+		var tdt0: float = torque_data[0]
+		var tdt1: float = torque_data[1]
+		var c_dsw: float = test_dsweight/2.0
+		c_dsw /= (delta*(wheel.TR_spin_resistence_rate/60.0))
+		
 		ds_weight += wheel.DT_influence
 		rpm_speed += wheel.spin*wheel.DT_influence
-		var w_torque_est: float = (torque_data[1]*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
-		w_torque_est = min(w_torque_est,test_cgrip_rads*test_dsweight)
+		var w_torque_est: float = (tdt1*wheel.DT_influence*g_ratio/rt_dsweight)/c_dsw
 		
-		var w_overdrive: float = max(w_torque_est/(torque_data[1]/(g_ratio/hz_scale)) -1.0,0)
+		w_torque_est = min(w_torque_est, test_cgrip_rads*c_dsw)
+		
+		var w_overdrive: float = max(w_torque_est/(tdt1/(g_ratio/hz_scale)) -1.0,0)
 
-		var weighed_grip: float = (test_cgrip_rads*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
+		var weighed_grip: float = (test_cgrip_rads*wheel.DT_influence*g_ratio/rt_dsweight)/c_dsw
 
 		var c_grip_od: float = test_cgrip_rads/(1.0/(w_overdrive/wheel.TR_spin_resistence_rate +1))
-		var acceleration: float = clamp(torque_data[0],-c_grip_od,c_grip_od)
+		var acceleration: float = clamp(tdt0, -c_grip_od,c_grip_od)
 
 		var dt_dist: float
 		if EN_DriveForceBehavior == 1:
@@ -743,7 +753,9 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		
 		wheel.dt_overdrive = w_overdrive
 
-		var w_torque: float = (align_t*wheel.DT_influence*g_ratio/rt_dsweight)/test_dsweight
+		var w_torque: float = (align_t*wheel.DT_influence*g_ratio/rt_dsweight)/c_dsw
+
+		w_torque /= (delta*(wheel.TR_spin_resistence_rate/60.0))
 
 		if gear<0:
 			wheel.dt_torque = -w_torque
@@ -773,9 +785,9 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 
 			wheel.MEASURE_travelled -= diff_dist
 			wheel.MEASURE_travelled -= diff_wheel_travel_distance*diff_stabilise
-			wheel.dt_torque -= diff_wheel_travel_distance
-			wheel.dt_torque -= diff_dampening_torque
-			wheel.dt_torque -= neighbour_diference*wheel.DIFF_Viscousity*delta*(w_overdrive +1)
+			wheel.dt_torque -= diff_wheel_travel_distance/(delta*(wheel.TR_spin_resistence_rate/60.0))
+			wheel.dt_torque -= diff_dampening_torque/(delta*(wheel.TR_spin_resistence_rate/60.0))
+			wheel.dt_torque -= neighbour_diference*wheel.DIFF_Viscousity*delta*(w_overdrive +1)/(delta*(wheel.TR_spin_resistence_rate/60.0))
 			
 			# central
 			var awd_diff_dampening_torque: float = diff_median - central_median
@@ -798,8 +810,8 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 
 			wheel.MEASURE_travelled_awd -= awd_diff_dist
 			wheel.MEASURE_travelled_awd -= awd_diff_wheel_travel_distance*awd_diff_stabilise
-			wheel.dt_torque -= awd_diff_wheel_travel_distance
-			wheel.dt_torque -= awd_diff_dampening_torque
+			wheel.dt_torque -= awd_diff_wheel_travel_distance/(delta*(wheel.TR_spin_resistence_rate/60.0))
+			wheel.dt_torque -= awd_diff_dampening_torque/(delta*(wheel.TR_spin_resistence_rate/60.0))
 
 #		wheel.spin = 20
 		wheel.dt_braking = wheel.DT_BrakeTorque*min(wheel.DT_BrakeBias*analog_decelerate + wheel.DT_HandbrakeBias*analog_handbrake,1)*abs_thresholded
