@@ -754,13 +754,10 @@ func _integrate_forces(state: PhysicsDirectBodyState):
 		wheel.dt_overdrive = w_overdrive
 
 		var w_torque: float = (align_t*wheel.DT_influence*g_ratio/rt_dsweight)/c_dsw
-
-		w_torque /= (delta*(wheel.TR_spin_resistence_rate/60.0))
-
 		if gear<0:
-			wheel.dt_torque = -w_torque
+			wheel.dt_torque = -w_torque/(delta*(wheel.TR_spin_resistence_rate/60.0))
 		else:
-			wheel.dt_torque = w_torque
+			wheel.dt_torque = w_torque/(delta*(wheel.TR_spin_resistence_rate/60.0))
 			
 		if wheel.df_lockto:
 			# bar
