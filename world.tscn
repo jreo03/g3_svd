@@ -1,10 +1,11 @@
-[gd_scene load_steps=12 format=2]
+[gd_scene load_steps=13 format=2]
 
-[ext_resource path="res://labs/gin_test/miata_sound_test.tscn" type="PackedScene" id=1]
+[ext_resource path="res://CUSTOMISE/car_template.tscn" type="PackedScene" id=1]
 [ext_resource path="res://ASSETS/maps/Test Map/scene.tscn" type="PackedScene" id=2]
 [ext_resource path="res://ASSETS/tachometre/tacho.tscn" type="PackedScene" id=3]
 [ext_resource path="res://ASSETS/cam.gd" type="Script" id=4]
 [ext_resource path="res://ASSETS/visual gravity system/vgs.tscn" type="PackedScene" id=5]
+[ext_resource path="res://CUSTOMISE/control_schemes/gta_4_controls.res" type="Resource" id=6]
 [ext_resource path="res://ASSETS/sw.png" type="Texture" id=10]
 [ext_resource path="res://ASSETS/sw_desired.png" type="Texture" id=11]
 [ext_resource path="res://ASSETS/live_cam.gd" type="Script" id=20]
@@ -106,6 +107,7 @@ script = SubResource( 2 )
 
 [node name="car" parent="." instance=ExtResource( 1 )]
 transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.627617, 0 )
+Controls = ExtResource( 6 )
 
 [node name="bonnetcam" type="Camera" parent="car"]
 transform = Transform( -1, 7.6194e-09, -8.70901e-08, 0, 0.996195, 0.0871558, 8.74228e-08, 0.0871558, -0.996195, 0, 0.627, 0.38 )
