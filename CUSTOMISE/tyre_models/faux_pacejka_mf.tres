@@ -11,4 +11,6 @@ TR_MDL_aspect_ratio = 0.202
 TR_MDL_shape_x = 1.0
 TR_MDL_shape_y = 1.0
 TR_MDL_linear = 0.0
-TR_MDL_friction = 1.0
+TR_MDL_curving = 0.239
+TR_MDL_curve_distance = 2.631
+TR_MDL_friction = 0.9
