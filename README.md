@@ -12,6 +12,6 @@ feel free to submit any issues
 
 
 ## notes when porting godot 3 code to godot 4
-- transform.xform(vector) -> transform*vector
-- transform.xform_inv(vector) -> vector*transform
+- basis.xform(vector) -> basis*vector
+- basis.xform_inv(vector) -> vector*basis
 - global_translation -> global_transform.origin
