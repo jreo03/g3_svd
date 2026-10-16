@@ -235,12 +235,18 @@ var past_global_axle_pos: Vector3
 var predicted_s_force: float
 var past_point: float
 
-export var DIFF_lock_to: NodePath
+export var DIFF_lock_to: NodePath setget xDIFF_lock_to
+var df_lockto: SVD_WHEEL
+func xDIFF_lock_to(val: NodePath) -> void:
+	DIFF_lock_to = val
+	if !readyed:
+		yield(self, "ready")
+	df_lockto = get_node(val)
+
 export var DIFF_Locking_Preload: float
 export(float,0,1) var DIFF_Locking_Power: float
 export(float,0,1) var DIFF_Locking_Coast: float
 export var DIFF_Viscousity: float = 2.0
-var df_lockto: SVD_WHEEL
 
 var rt_instanced_rays: Array
 
@@ -271,7 +277,6 @@ func _ready():
 	SRC_ray.add_exception_rid(car.get_rid())
 	SRC_ray.enabled = SUS_raytype == 0
 	
-	df_lockto = get_node(DIFF_lock_to)
 	for i in AN_spinning_meshes:
 		a_s_m.append(get_node(i))
 	for i in AN_fixed_meshes:
