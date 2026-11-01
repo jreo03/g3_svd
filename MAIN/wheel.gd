@@ -89,10 +89,7 @@ onready var SR_contact_ref: Spatial = $angled/alignment_ref/pitched/contact_poin
 onready var SR_difference_ref: Spatial = $contact_point_space_ref
 var SR_steer_ref: float
 
-export var WL_radius: float = 0.29 setget xWL_radius
-func xWL_radius(val: float) -> void:
-	WL_radius = val
-
+export var WL_radius: float = 0.29
 export var WL_weight: float = 1.0
 
 export var TR_Model: Resource setget xtr_mdl
@@ -148,6 +145,7 @@ var SP_dampening: float
 var STATE_surface_checked: bool
 
 export(float, 0, 1) var DT_influence: float = 1
+export var DT_gear_mult: float = 1.0
 export var DT_BrakeTorque: float = 5000
 export(float, 0, 1) var DT_BrakeBias: float = 1
 export(float, 0, 1) var DT_HandbrakeBias: float = 0
@@ -162,8 +160,8 @@ var a_f_m: Array
 
 onready var car: RigidBody = get_parent()
 
-var spin: float = 0
-var diff_spin: float = 0
+var spin: float
+var diff_spin: float
 var total_w_weight: float
 
 var SRC_ray: RayCast
@@ -242,7 +240,7 @@ func xDIFF_lock_to(val: NodePath) -> void:
 	if !readyed:
 		yield(self, "ready")
 	df_lockto = get_node(val)
-
+	
 export var DIFF_Locking_Preload: float
 export(float,0,1) var DIFF_Locking_Power: float
 export(float,0,1) var DIFF_Locking_Coast: float
@@ -311,7 +309,6 @@ func _physics_process(delta):
 	var added_rest: float = SUS_compression_length + SUS_rest_height
 	var comp_max_pos: float = SUS_compression_length - SUS_max_compression_length
 	
-	
 	var SP_bump_dipped: float = SP_fake_bump_height*(sin(global_translation.x*SP_fake_bump_frequency) + cos(global_translation.z*SP_fake_bump_frequency) +2)/4.0
 	
 	var sus_direction: Basis = global_transform.basis.orthonormalized()
@@ -340,18 +337,6 @@ func _physics_process(delta):
 
 	real_torque *= delta*(TR_spin_resistence_rate/60.0)
 	real_brake *= delta*(TR_spin_resistence_rate/60.0)
-
-#	work needed
-#	if dt_torque>0:
-#		real_torque = max(dt_torque -dt_braking, 0)
-#
-#	else:
-#		real_torque = min(dt_torque +dt_braking, 0)
-#
-#	if spin>0:
-#		real_brake = max(dt_braking -dt_torque, 0)
-#	else:
-#		real_brake = max(dt_braking +dt_torque, 0)
 
 	var hz_scale: float = delta*60.0
 	spin += real_torque/(real_dt_overdrive +1.0)
@@ -695,7 +680,7 @@ func _physics_process(delta):
 
 		STATE_brake_locked = real_brake>(grip*((TR_spin_resistence_rate*delta)))
 #		STATE_brake_locked = true
-		var predicted_grip: float = 0
+		var predicted_grip: float
 		if grip>0:
 			var modifier: float = ((TR_spin_resistence_rate*delta)/(real_dt_overdrive +1.0))
 
@@ -707,7 +692,7 @@ func _physics_process(delta):
 				spin -= w_dist/p
 				OUTPUT_aligned_spin = spin
 				MEASURE_aligning -= w_dist/p
-				
+		
 		var t_stiff: float = lerp(t_stiff_y,t_stiff_x,pow(travel_angle,0.5))
 		var t_damp: float = lerp(t_damp_y,t_damp_x,pow(travel_angle,0.5))
 		var t_response: float = lerp(TR_grip_response,TR_grip_response*TR_MDL_aspect_ratio,pow(travel_angle,0.5))
@@ -911,4 +896,4 @@ func _physics_process(delta):
 		AN_spin.rotate_x(spin*delta)
 
 	MEASURE_travelled += spin
-	MEASURE_travelled_awd += spin
+	MEASURE_travelled_awd += spin*DT_gear_mult
